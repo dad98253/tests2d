@@ -22,12 +22,14 @@ you are not interested in.
 Some of the code has been purposely written to attempt to confuse an optimizing compiler. A 
 good compiler should be smart enough to catch these. 
 
-Minimal checks are made to determine computational correctness. So take great care when you
-move the code to a new machine. Be careful not to over-flow any short integers in the do loop
-counters. The code appears to run correctly on the gfortran family of compilers and has run
-(in the past) on Cray, Floating Point System (Portland Group), Microsoft, Compaq, Control Data
-(ftn), VAX, and a host of others that I can't even remember any more... Sections of the code
-have also been compiled using CUDA.
+Minimal checks are made to determine computational correctness. For example, the code does not
+attempt to verify that the asynchronous I/O is actually asynchronous (many machines just pretend!).
+So take great care when you move the code to a new machine. I.e., be careful not to overflow any
+short integers in the do loop counters.
+
+The code appears to run correctly on the gfortran family of compilers and has run (in the past) on
+Cray, Floating Point System (Portland Group), Microsoft, Compaq, Control Data (ftn), VAX VMS, and a host
+of others that I can't even remember any more... Sections of the code have also been compiled using CUDA.
 
 Have fun,
 -John
