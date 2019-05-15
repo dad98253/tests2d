@@ -1,0 +1,2963 @@
+      PROGRAM TEST2D
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS PROGRAM MEASURES THE COMPLEX VECTOR OPERATION SPEED, THE I/O 
+C RATE FOR DIRECT FORTRAN READS, AND VARIOUS SCALAR COMPUTATION SPEEDS
+C 
+C ********************************************************************* 
+C ********************************************************************* 
+C 
+C NJ IS THE LENGTH OF THE SCRATCH ARRAYS USED IN THE VECTOR AND I/O 
+C SPEED TESTS.
+C 
+      PARAMETER ( NJ = 650 000 )
+      PARAMETER ( NJR = NJ * 2 )
+      PARAMETER ( LOTS = 1000000 )
+      PARAMETER ( NUMTESTS = 22 )
+C 
+      COMPLEX*16 A(NJ),B(NJ),C(NJ)
+      DIMENSION RA(NJR),RB(NJR),RC(NJR)
+      LOGICAL TESTFLAG(NUMTESTS)
+      CHARACTER*25 TESTNAME(NUMTESTS)
+C 
+C 
+C THE FOLLOWING ARE THE VARIOUS VECTOR AND MATRIX SIZES THAT ARE TO 
+C BE TESTED.
+C 
+      DIMENSION LENVEC(11)
+      DIMENSION ISTRYD(6) 
+      DIMENSION LDIM(6) 
+      DIMENSION LEMBED(2) 
+      DIMENSION LRECL(8)
+      DIMENSION LENFFT(10)
+C 
+      INTEGER P
+      INTEGER ITEST
+C 
+      LOGICAL ASYNC
+      LOGICAL PROMPT
+C 
+      INTRINSIC DATAN2 
+      INTRINSIC DSIN 
+      INTRINSIC DTAN 
+      INTRINSIC DEXP 
+      INTRINSIC DLOG10
+      INTRINSIC DLOG 
+C 
+      COMMON /ASYFLG/ ASYNC 
+C 
+      DATA LENVEC / 1 , 3 , 5 , 10 , 50 , 100 , 500 , 1 000 , 5 000 , 
+     +              10 000 , 50 000 / 
+      DATA LRECL / 10 , 50 , 100 , 500 , 1 000 , 5 000 , 10 000 , 
+     +             50 000 / 
+      DATA ISTRYD / 1 , 2 , 4 , 8 , 16 , 32 / 
+      DATA LDIM / 3 , 4 , 10 , 50 , 100 , 500 / 
+      DATA LEMBED / 30 , 60 / 
+      DATA LENFFT / 4 , 5 , 6 , 7 , 8 , 9 , 10 , 12 , 14 , 16 / 
+      DATA TESTFLAG /  NUMTESTS * .TRUE. /
+      DATA TESTNAME / 'ZAXPY' , 'DAXPY' , 'ZDOTU' , 'DDOT' , 
+     + 'DIRECT ACCESS' , 'SEQUENTIAL ACCESS' , 'ASYNCHRONOUS DIRECT' ,
+     + 'REAL MATRIX-VECTOR' , 'REAL MATRIX-MATRI' ,
+     + 'COMPLEX MATRIX-VECTOR', 'COMPLEX MATRIX-MATRIX' ,
+     + 'HANKEL FUNCTION' , 'GENERAL SCALAR FLOP RATE' ,
+     + 'ATAN2' , 'SIN' , 'TAN' , 'EXP' , 'ALOG10' , 'LOG' ,
+     + 'ANTI-LOG' , 'FFT' , 'WHETSTONE'
+     +              /
+      DATA PROMPT / .TRUE. /
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C
+C ITEST IS THE TEST NUMBER - USED TO INDEX INTO THE BOOL TESTFLAG VECTOR
+C 	
+	  ITEST = 0
+c      do 10001 LOTSOL = 1,LOTS
+      do 10001 LOTSOL = 1,1
+      open ( unit = 1 , file = 'host.dat' , status = 'unknown' )
+c 
+C ASYNC MUST BE SET TO .TRUE. IF THE ASYNCHONOUS I/O TEST IS TO BE
+C PERFORMED 
+C 
+      ASYNC = .TRUE. 
+C 
+C PROMPT THE USER FOR THE ESTIMATED VECTOR,SCALAR, AND I/O PERFORMANCE
+C 
+      IF ( PROMPT ) THEN	
+         PRINT * , ' ENTER ESTIMATED VECTOR FLOP RATE IN FLOATING' , 
+     +          ' POINT OPERATIONS PER SECOND :'
+         READ ( * , * ) EVFR 
+         PRINT * , ' ENTER THE ESTIMATED I/O RATE IN SINGLE PRECISION' , 
+     +          ' WORDS PER SECOND :' 
+         READ ( * , * ) EIOR 
+         PRINT * , ' ENTER ESTIMATED SCALAR FLOP RATE IN FLOATING ' ,
+     +          'POINT OPERATIONS PER SECOND :' 
+         READ ( * , * ) ESFR 
+      ELSE
+         EVFR = 1 000 000 000.0D0
+         EIOR =    90 000 000.0D0
+         ESFR = 1 000 000 000.0D0      	  
+      ENDIF
+C 
+C 
+C ********************************************************************* 
+C 
+C DO THE VECTOR SPEED TESTS
+C 
+C 
+C ZAXPY TEST :
+C       
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	     PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 1100 ISTR = 1 , 1
+         DO 1000 ILEN = 1 , 11
+            IF ( LENVEC(ILEN) * ISTRYD(ISTR) .GT. NJ ) GO TO 1000 
+            CALL CAXTES ( EVFR , A , B , LENVEC(ILEN) , ISTRYD(ISTR) )
+ 1000    CONTINUE 
+ 1100 CONTINUE
+      ENDIF
+C 
+C DAXPY TEST :
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 2100 ISTR = 1 , 1
+         DO 2000 ILEN = 1 , 11
+            IF ( LENVEC(ILEN) * ISTRYD(ISTR) .GT. NJ * 2 ) GO TO 2000 
+            CALL SAXTES ( EVFR ,RA ,RB , LENVEC(ILEN) , ISTRYD(ISTR) )
+ 2000    CONTINUE 
+ 2100 CONTINUE
+      ENDIF
+C 
+C ZDOTU TEST :
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	  PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 3100 ISTR = 1 , 6
+         DO 3000 ILEN = 1 , 11
+            IF ( LENVEC(ILEN) * ISTRYD(ISTR) .GT. NJ ) GO TO 3000 
+            CALL CDOTES ( EVFR , A , B , LENVEC(ILEN) , ISTRYD(ISTR) )
+ 3000    CONTINUE 
+ 3100 CONTINUE
+      ENDIF
+C 
+C DDOT TEST : 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	  PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 4100 ISTR = 1 , 1
+         DO 4000 ILEN = 1 , 11
+            IF ( LENVEC(ILEN) * ISTRYD(ISTR) .GT. NJ * 2 ) GO TO 4000 
+            CALL DDOTES ( EVFR ,RA ,RB , LENVEC(ILEN) , ISTRYD(ISTR) )
+ 4000    CONTINUE 
+ 4100 CONTINUE
+      ENDIF
+C 
+C ********************************************************************* 
+C 
+C DO THE I/O RATE TEST
+C 
+C 
+C 
+C DO THE FORTRAN DIRECT ACCESS FILE TEST :
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	  PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 5000 ILEN = 1 , 8
+            IF ( LRECL(ILEN) .GT. NJ ) GO TO 5000 
+         CALL DIOTES ( EIOR , RA , LRECL(ILEN) ) 
+ 5000 CONTINUE
+      ENDIF
+C 
+C DO THE FORTRAN SEQUENTIAL ACCESS FILE TEST :
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	  PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 6000 ILEN = 1 , 8
+            IF ( LRECL(ILEN) .GT. NJ ) GO TO 6000 
+         CALL SIOTES ( EIOR , RA , LRECL(ILEN) ) 
+ 6000 CONTINUE
+      ENDIF
+C 
+C DO THE ASYNCHRONOUS DIRECT ACCESS FILE TEST : 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	  PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         IF ( ASYNC ) THEN 
+C 
+            DO 7000 ILEN = 1 , 8 
+               IF ( LRECL(ILEN) .GT. NJ ) GO TO 7000 
+               CALL AIOTES ( EIOR , RA , LRECL(ILEN) )
+ 7000       CONTINUE 
+C 
+         END IF
+      END IF
+C 
+C ********************************************************************* 
+C 
+C DO THE MATRIX SPEED TESTS 
+C 
+C 
+C REAL MATRIX-VECTOR TEST : 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	  PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 8000 IDIM = 1 , 6
+         IF ( LDIM(IDIM) * LDIM(IDIM) .GT. NJ * 2 ) GO TO 8000
+         CALL RMVTES ( EVFR , RA , RB , RC , LDIM(IDIM) )
+ 8000    CONTINUE 
+      ENDIF
+C 
+C REAL MATRIX-MATRIX TEST : 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	  PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 8100 IDIM = 1 , 6
+         IF ( LDIM(IDIM) * LDIM(IDIM) .GT. NJ * 2 ) GO TO 8100
+         CALL RMMTES ( EVFR , RA ,RB , RC , LDIM(IDIM) )
+ 8100 CONTINUE
+      ENDIF
+C 
+C COMPLEX MATRIX-VECTOR TEST :
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	  PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 8200 IDIM = 1 , 6
+         IF ( LDIM(IDIM) * LDIM(IDIM) .GT. NJ ) GO TO 8200
+         CALL CMVTES ( EVFR , A , B , C , LDIM(IDIM) )
+ 8200    CONTINUE
+      ENDIF
+C 
+C COMPLEX MATRIX-MATRIX TEST :
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      DO 8300 IDIM = 1 , 6
+         IF ( LDIM(IDIM) * LDIM(IDIM) .GT. NJ ) GO TO 8300
+         CALL CMMTES ( EVFR , A , B , C , LDIM(IDIM) )
+ 8300 CONTINUE
+      ENDIF
+C 
+C ******************************************************************
+C 
+C 
+C MEASURE THE TIME IT TAKES TO CALCULATE HANKEL FUNCTIONS.
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         CALL HANTES ( ESFR )
+      ENDIF
+C 
+C ********************************************************************* 
+C 
+C ESTIMATE THE GENERAL SCALAR FLOP RATE 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         CALL SCATES ( ESFR )
+      ENDIF
+C 
+C 
+C ******************************************************************
+C 
+C MEASURE THE TIME IT TAKES TO CALCULATE ATAN2 FUNCTIONS. 
+C
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	  PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+      CALL P2CALL ( ESFR , DATAN2 , 'ATAN2' , RAN3 ( IDUM ) , RAN3 ( IDUM
+     +          ) )
+      ENDIF
+C 
+C ******************************************************************
+C 
+C MEASURE THE TIME IT TAKES TO CALCULATE SIN FUNCTIONS. 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         CALL P1CALL ( ESFR , DSIN , 'SIN' , RAN3 ( IDUM ) )
+      ENDIF
+C 
+C ******************************************************************
+C 
+C MEASURE THE TIME IT TAKES TO CALCULATE TAN FUNCTIONS. 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         CALL P1CALL ( ESFR , DTAN , 'TAN' , RAN3 ( IDUM ) )
+      ENDIF
+C 
+C ******************************************************************
+C 
+C MEASURE THE TIME IT TAKES TO CALCULATE EXP FUNCTIONS. 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         CALL P1CALL ( ESFR , DEXP , 'EXP' , RAN3 ( IDUM ) )
+      ENDIF
+C 
+C ******************************************************************
+C 
+C MEASURE THE TIME IT TAKES TO CALCULATE ALOG10 FUNCTIONS.
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         CALL P1CALL ( ESFR , DLOG10 , 'ALOG10' , RAN3 ( IDUM ) )
+      ENDIF
+C 
+C ******************************************************************
+C 
+C MEASURE THE TIME IT TAKES TO CALCULATE LOG FUNCTIONS. 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         CALL P1CALL ( ESFR , DLOG , 'LOG' , RAN3 ( IDUM ) )
+      ENDIF
+C 
+C ******************************************************************
+C 
+C MEASURE THE TIME IT TAKES TO CALCULATE ANTI-LOG FUNCTIONS.
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         CALL ANTES ( ESFR , RA , RB , MIN0 ( NJ , 1000 ) )
+      ENDIF
+C 
+C ******************************************************************
+C 
+C 
+C ******************************************************************
+C 
+C DO THE FFT TEST 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         DO 9200 ILEN = 1 , 10 
+            N = 2 ** LENFFT(ILEN)
+            IF ( N .GT. NJ ) GO TO 9200
+            CALL FFTES ( EVFR , ESFR , A , B , LENFFT(ILEN) , N )
+ 9200    CONTINUE
+      ENDIF
+C 
+C ******************************************************************
+C 
+C DO THE WHETSTONE TEST 
+C 
+	  ITEST = ITEST + 1
+	  IF ( TESTFLAG(ITEST) ) THEN
+	  	 PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+         AI2 = ESFR * .0015D0 * 1.D0
+         AMAXSIZ = 1 000 000 000.0D0 / 899.D0
+         AIOL = AI2 / AMAXSIZ
+         IOL = MAX(1.0D0,AIOL)
+         NLOOP = MAX( 1.0D0 , AI2 / DBLE(IOL) )
+         CALL WHETS ( NLOOP , IOL )
+      ENDIF
+C 
+C 
+C 
+      close(1)
+10001 continue
+      END 
+      SUBROUTINE GETSEC ( TIME )
+C 
+C SUBROUTINE TO RETURN THE ACCUMULATED CPU TIME IN SECONDS
+C 
+C CALLING PARAMETERS :
+C 
+C  TIME    (REAL) (OUTPUT) THE ACCUMULATED CPU TIME ( NOT WALL TIME ) 
+C 
+C ********************************************************************
+C 
+      DOUBLE PRECISION TIME , TIME2
+C 
+C 
+      SAVE TIME2
+      TIME2 = TIME
+c      TIME = SECOND ( TIME2 ) 
+      TIME = SECOND (  ) 
+c	print *,"time2,time = ",time2,time
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE GETWAL ( TIME )
+C 
+C SUBROUTINE TO RETURN THE ACCUMULATED WALL TIME IN SECONDS 
+C 
+C CALLING PARAMETERS :
+C 
+C  TIME    (REAL) (OUTPUT) THE ACCUMULATED WALL TIME
+C 
+C ********************************************************************
+C 
+      DOUBLE PRECISION TIME 
+C 
+C 
+      TIME = SECNDS ( 0.0 ) 
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE J0Y0(P1,AJ0,AY0)                                       
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+      IF (P1.GT.3.D0) GO TO 1000                                          
+      P=P1*P1/9.D0                                                        
+      AJ0=P*(.0444479D0-P*(.0039444D0-P*.0002100D0))                          
+      AJ0=1.D0-P*(2.2499997D0-P*(1.2656208D0-P*(.3163866D0-AJ0)))               
+      AY0=P*(.25300117D0-P*(.04261214D0-P*(.00427916D0-P*.00024846D0)))         
+      AY0=.36746691D0+P*(.60559366D0-P*(.74350384D0-AY0))                     
+      AY0=.318309886D0* DLOG(2.25D0*P)*AJ0+AY0                               
+      GO TO 1001                                                        
+ 1000 P=3.D0/P1                                                           
+      AY0=P*(.00262573D0-P*(.00054125D0+P*(.00029333D0-P*.00013558D0)))         
+      AY0=P1-.78539816D0-P*(.04166397D0+P*(.00003954D0-AY0))                  
+      AJ0=P*(.00009512D0-P*(.00137237D0-P*(.00072805D0-P*.00014476D0)))         
+      P=(.79788456D0-P*(.00000077D0+P*(.00552740D0+AJ0)))/DSQRT(P1)            
+      AJ0=P*DCOS(AY0)                                                    
+      AY0=P*DSIN(AY0)                                                    
+ 1001 RETURN                                                            
+      END                                                               
+      SUBROUTINE SCAL(P1,AJ0,AY0)                                       
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE ATTEMPTS TO ESTIMATE THE EXECUTION SPEED OF TYPICAL
+C SCALAR OPERATIONS.  MAKE SURE THAT THE COMPLIER OPTIMIZES THIS
+C CODE WIHTOUT USING ANY VECTOR REGISTERS OR COMMANDS.  IF THE
+C COMPLIER CAN PIPELINE THIS CODE, THAT IS OKAY.  BUT PLEASE DO NOT 
+C VECTORIZE IT. 
+C 
+C                                                 - THANKS, 
+C                                                   24JUL86 
+C 
+C ********************************************************************* 
+C 
+      P=P1*P1/9.D0                                                        
+      AJ0=P*(.0444479D0-P*(.0039444D0-P*.0002100D0))                          
+      AJ0=1.-P*(2.2499997D0-P*(1.2656208D0-P*(.3163866D0-AJ0)))               
+      AY0=P*(.25300117D0-P*(.04261214D0-P*(.00427916D0-P*.00024846D0)))         
+      AY0=.36746691D0+P*(.60559366D0-P*(.74350384D0-AY0))                     
+      AY0=.318309886D0*    (2.25D0*P)*AJ0+AY0                               
+      P = 3.D0/P1 
+      AY1=P*(.00262573D0-P*(.00054125D0+P*(.00029333D0-P*.00013558D0)))         
+      AY1=P1-.78539816D0-P*(.04166397D0+P*(.00003954D0-AY1))                  
+      AJ1=P*(.00009512D0-P*(.00137237D0-P*(.00072805D0-P*.00014476D0)))         
+      P=(.79788456D0-P*(.00000077D0+P*(.00552740D0+AJ1)))/    (P1)            
+      AJ0 = AJ0 + AJ1 
+      AY0 = AY0 + AY1 
+      RETURN                                                            
+      END                                                               
+      SUBROUTINE CAXTES ( EVFR , A , B , ILEN , ISTR )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE FLOP RATE FOR THE ZAXPY BLAS ROUTINE AS 
+C A FUNCTION OF VECTOR LENGTH AND STRIDE
+C 
+C CALLING PARAMETERS :
+C 
+C  EVFR        (REAL) THE ESTIMATED VECTOR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (COMPLEX) SCRATCH ARRAY USED FOR THE VECTOR TEST 
+C 
+C  B           (COMPLEX) SECOND SCRATCH ARRAY 
+C 
+C  ILEN        (INTEGER) THE LENGTH OF THE VECTORS
+C 
+C  ISTR        (INTEGER) THE VECTOR STRIDE
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(ILEN) 
+      DIMENSION B(ILEN) 
+C 
+      COMPLEX*16 A
+      COMPLEX*16 B
+      COMPLEX*16 C
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE VECTOR ROUTINE SHOULD BE 
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      AI2 = EVFR * 30.D0 / ( 8.D0 * DBLE(ILEN) )
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( AI2 .LE. 0.D0 ) THEN 
+         PRINT 8000 , 'ZAXPY' , ILEN
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR LENGTH = ' , I10 )
+         RETURN 
+      END IF
+      FLOPS = AI2 * 8.D0 * DBLE(ILEN) 
+
+      AMAXSIZ = 1 000 000 000.0D0
+      AIOL = AI2 / AMAXSIZ
+      IOL = MAX(1.0D0,AIOL)
+      I2 = AI2 / IOL
+C 
+C INITIALIZE THE SCRATCH VECTORS
+C 
+      DO 100 I = 1 , ILEN 
+      A(I) = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) ) 
+      B(I) = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) ) 
+  100 CONTINUE
+      C = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) )
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 210 IJK = 1 , IOL
+      DO 200 I = 1 , I2 
+      CALL ZAXPY ( ILEN , C , B , ISTR , A , ISTR ) 
+  200 CONTINUE
+  210 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'ZAXPY' , ILEN , ISTR , FLOPS / TIME1
+      WRITE ( 1 , 9000 ) 'ZAXPY' , ILEN , ISTR , FLOPS / TIME1
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , 2I10 , E20.3 , I15 , E20.5 )
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE SAXTES ( EVFR , A , B , ILEN , ISTR )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE FLOP RATE FOR THE DAXPY BLAS ROUTINE AS 
+C A FUNCTION OF VECTOR LENGTH AND STRIDE
+C 
+C CALLING PARAMETERS :
+C 
+C  EVFR        (REAL) THE ESTIMATED VECTOR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (REAL) SCRATCH ARRAY USED FOR THE VECTOR TEST
+C 
+C  B           (REAL) SECOND SCRATCH ARRAY
+C 
+C  ILEN        (INTEGER) THE LENGTH OF THE VECTORS
+C 
+C  ISTR        (INTEGER) THE VECTOR STRIDE
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(ILEN) 
+      DIMENSION B(ILEN) 
+C 
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE VECTOR ROUTINE SHOULD BE 
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      AI2 = EVFR * 30.D0 / ( 2.D0 * DBLE(ILEN) )
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( AI2 .LE. 0.D0 ) THEN 
+         PRINT 8000 , 'DAXPY' , ILEN
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR LENGTH = ' , I10 )
+         RETURN 
+      END IF
+      FLOPS = AI2 * 2.D0 * DBLE(ILEN) 
+
+      AMAXSIZ = 1 000 000 000.0D0
+      AIOL = AI2 / AMAXSIZ
+      IOL = MAX(1.0D0,AIOL)
+      I2 = AI2 / IOL
+C 
+C INITIALIZE THE SCRATCH VECTORS
+C 
+      DO 100 I = 1 , ILEN 
+      A(I) = RAN3 ( IDUM )
+      B(I) = RAN3 ( IDUM )
+  100 CONTINUE
+      C = RAN3 ( IDUM ) 
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 210 IJK = 1 , IOL
+      DO 200 I = 1 , I2 
+      CALL DAXPY ( ILEN , C , B , ISTR , A , ISTR ) 
+  200 CONTINUE
+  210 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'DAXPY' , ILEN , ISTR , FLOPS / TIME1
+      WRITE ( 1 , 9000 ) 'DAXPY' , ILEN , ISTR , FLOPS / TIME1
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , 2I10 , E20.3 , I15 , E20.5 )
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE CDOTES ( EVFR , A , B , ILEN , ISTR )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE FLOP RATE FOR THE ZDOTU BLAS ROUTINE AS 
+C A FUNCTION OF VECTOR LENGTH AND STRIDE
+C 
+C CALLING PARAMETERS :
+C 
+C  EVFR        (REAL) THE ESTIMATED VECTOR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (COMPLEX) SCRATCH ARRAY USED FOR THE VECTOR TEST 
+C 
+C  B           (COMPLEX) SECOND SCRATCH ARRAY 
+C 
+C  ILEN        (INTEGER) THE LENGTH OF THE VECTORS
+C 
+C  ISTR        (INTEGER) THE VECTOR STRIDE
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(ILEN) 
+      DIMENSION B(ILEN) 
+C 
+      COMPLEX*16 A
+      COMPLEX*16 B
+      COMPLEX*16 C
+      COMPLEX*16 ZDOTU
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE VECTOR ROUTINE SHOULD BE 
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      AI2 = EVFR * 30.D0 / ( 8.D0 * DBLE(ILEN) )
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( AI2 .LE. 0.D0 ) THEN 
+         PRINT 8000 , 'ZDOTU' , ILEN
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR LENGTH = ' , I10 )
+         RETURN 
+      END IF
+      FLOPS = AI2 * 8 * ILEN 
+      I2 = AI2
+
+      AMAXSIZ = 1 000 000 000.0D0
+      AIOL = AI2 / AMAXSIZ
+      IOL = MAX(1.0D0,AIOL)
+      I2 = AI2 / IOL
+C 
+C INITIALIZE THE SCRATCH VECTORS
+C 
+      DO 100 I = 1 , ILEN 
+      A(I) = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) ) 
+      B(I) = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) ) 
+  100 CONTINUE
+      C = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) )
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 210 IJK = 1, IOL
+      DO 200 I = 1 , I2 
+      C = ZDOTU ( ILEN , B , ISTR , A , ISTR )
+      A(1) = C
+  200 CONTINUE
+      B(1) = C
+  210 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'ZDOTU' , ILEN , ISTR , FLOPS / TIME1
+      WRITE ( 1 , 9000 ) 'ZDOTU' , ILEN , ISTR , FLOPS / TIME1
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , 2I10 , E20.3 , I15 , E20.5 )
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE DDOTES ( EVFR , A , B , ILEN , ISTR )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE FLOP RATE FOR THE DDOT BLAS ROUTINE AS
+C A FUNCTION OF VECTOR LENGTH AND STRIDE
+C 
+C CALLING PARAMETERS :
+C 
+C  EVFR        (REAL) THE ESTIMATED VECTOR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (REAL) SCRATCH ARRAY USED FOR THE VECTOR TEST
+C 
+C  B           (REAL) SECOND SCRATCH ARRAY
+C 
+C  ILEN        (INTEGER) THE LENGTH OF THE VECTORS
+C 
+C  ISTR        (INTEGER) THE VECTOR STRIDE
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(ILEN) 
+      DIMENSION B(ILEN) 
+C 
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE VECTOR ROUTINE SHOULD BE 
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      AI2 = EVFR * 30.D0 / ( 2.D0 * DBLE(ILEN) )
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( AI2 .LE. 0.D0 ) THEN 
+         PRINT 8000 , 'DDOT' , ILEN 
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR LENGTH = ' , I10 )
+         print *,"I2 = ", AI2
+         RETURN 
+      END IF
+      FLOPS = AI2 * 2 * ILEN
+      I2 = AI2
+
+      AMAXSIZ = 1 000 000 000.0D0
+      AIOL = AI2 / AMAXSIZ
+      IOL = MAX(1.0D0,AIOL)
+      I2 = AI2 / IOL
+C 
+C INITIALIZE THE SCRATCH VECTORS
+C 
+      DO 100 I = 1 , ILEN 
+      A(I) = RAN3 ( IDUM )
+      B(I) = RAN3 ( IDUM )
+  100 CONTINUE
+      C = RAN3 ( IDUM ) 
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 210 IJK = 1 , IOL
+      DO 200 I = 1 , I2 
+      C = DDOT ( ILEN , B , ISTR , A , ISTR ) 
+      B(1) = C
+  200 CONTINUE
+      A(1) = C
+  210 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'DDOT' , ILEN , ISTR , FLOPS / TIME1 
+      WRITE ( 1 , 9000 ) 'DDOT' , ILEN , ISTR , FLOPS / TIME1 
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , 2I10 , E20.3 , I15 , E20.5 )
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE DIOTES ( EIOR , A , LRECL )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE I/O RATE FOR FORTRAN DIRECT ACCESS FILES
+C AS A FUNCTION OF RECORD LENGTH
+C 
+C CALLING PARAMETERS :
+C 
+C  EIOR        (REAL) THE ESTIMATED I/O RATE OF THE MACHINE IN WORDS
+C              PER SECOND 
+C 
+C  A           (REAL) SCRATCH ARRAY USED FOR THE I/O TEST 
+C 
+C  LRECL       (INTEGER) THE LENGTH OF THE RECORDS
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(LRECL)
+C 
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF RECORDS THAT THE I/O ROUTINE SHOULD 
+C WRITE TO DISK.  THE GOAL IS TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      AI2 = EIOR * 30.D0 / ( LRECL ) 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( AI2 .LE. 0.0D0 .OR. AI2 .GT. 1.D9 ) THEN 
+         PRINT 8000 , 'DIRECT' , LRECL
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR LENGTH = ' , I10 )
+         RETURN 
+      END IF
+
+      WORDS = AI2 * LRECL
+C 
+C INITIALIZE THE SCRATCH ARRAY
+C 
+      DO 100 I = 1 , LRECL
+      A(I) = RAN3 ( IDUM )
+  100 CONTINUE
+C 
+C VAX OPEN STATEMENT :
+C 
+C NOTE :  THE MAXIMUM DIRECT ACCESS RECORD LENGTH ON THE VAX IS 
+C         32K BYTES 
+C 
+c      IF ( LRECL * 8 .GT. 32 000 ) THEN 
+c         PRINT 8000 , 'DIRECT' , LRECL
+c         RETURN 
+c      END IF
+C 
+C 
+c      OPEN ( UNIT = 2 , FORM = 'UNFORMATTED' , STATUS = 'NEW' , 
+c     +       ACCESS = 'DIRECT' , RECL = LRECL  * 8 , ORGANIZATION =
+c     +       'SEQUENTIAL' , RECORDTYPE = 'FIXED' )
+      OPEN ( UNIT = 2 , FORM = 'UNFORMATTED' , STATUS = 'NEW' , 
+     +       FILE = 'tape2.dat' ,
+     +       ACCESS = 'DIRECT' , RECL = LRECL  * 8  )
+C 
+C CREATE A FILE.  THE TIME IT TAKES TO CREATE THE FILE IS UNIMPORTANT.
+C 
+      AMAXSIZ = 1 000 000 000.0D0
+      AIOL = (DBLE(LRECL)  * 8D0 * AI2) / AMAXSIZ
+      IOL = MAX(1.0D0,AIOL)
+      I2 = AI2 / IOL
+
+      DO 300 I = 1 , I2 
+      A(LRECL) = I
+      A(1) = LRECL
+      WRITE ( 2 , REC = I ) A 
+  300 CONTINUE
+      DSAVE = A(1)
+      A(1) = RAN3 ( IDUM )
+      A(LRECL) = RAN3 ( IDUM )
+C 
+C READ THE DATA BACK IN.
+C 
+C 
+C THE GETWAL ROUTINE RETURNS THE ACCUMULATED WALL TIME
+C 
+      CALL GETWAL ( START ) 
+      ICOUNT = 0
+      DO 410 IJK = 1,IOL
+      DO 400 I = 1 , I2 
+      READ ( 2 , REC = I ) A
+      IF ( A(1) .NE. DSAVE .OR. A(LRECL) .NE. DBLE(I) ) THEN
+        PRINT *,"Bad read of record number ",I
+        ICOUNT = ICOUNT + 1
+        IF ( ICOUNT .GT. 50 ) THEN
+          PRINT *,"Too man errors, aborting direct read test"
+          RETURN
+        END IF
+      END IF
+  400 CONTINUE
+  410 CONTINUE
+C 
+C GET THE ENDING WALL TIME
+C 
+      CALL GETWAL ( END ) 
+C 
+C CALCULATE THE TOTAL WALL TIME FOR THE TEST
+C 
+      TIME2 = END - START 
+C 
+C SCRATCH THE FILE
+C 
+      CLOSE ( UNIT = 2 , STATUS = 'DELETE' )
+C 
+C MAKE SURE THAT THE DATA WAS READ CORRECTLY
+C 
+      IF ( A(LRECL) .NE. I2 .OR. A(1) .NE. LRECL ) THEN 
+         PRINT * , ' ERROR : THERE IS SOMETHIN WRONG WITH THE DIRECT' 
+         PRINT * , '         ACCESS OPEN STATEMENT.'
+         PRINT * , '         A(1),A(LRECL),LRECL = ' , A(1) , A(LRECL) ,
+     +   LRECL
+         RETURN 
+      END IF
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'DIRECT' , LRECL , WORDS / TIME2 
+      WRITE ( 1 , 9000 ) 'DIRECT' , LRECL , WORDS / TIME2 , 
+     +      I2 , TIME2
+ 9000 FORMAT ( 1X , A20 , I10 , E20.3 , I15 , E20.5 ) 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE SIOTES ( EIOR , A , LRECL )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE I/O RATE FOR FORTRAN SEQUENTIAL ACCESS
+C FILES AS A FUNCTION OF RECORD LENGTH
+C 
+C CALLING PARAMETERS :
+C 
+C  EIOR        (REAL) THE ESTIMATED I/O RATE OF THE MACHINE IN WORDS
+C              PER SECOND 
+C 
+C  A           (REAL) SCRATCH ARRAY USED FOR THE I/O TEST 
+C 
+C  LRECL       (INTEGER) THE LENGTH OF THE RECORDS
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(LRECL)
+C 
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF RECORDS THAT THE I/O ROUTINE SHOULD 
+C WRITE TO DISK.  THE GOAL IS TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      AI2 = EIOR * 30.D0 / ( LRECL ) 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( AI2 .LE. 0.D0 .OR. AI2 .GT. 1.D9 ) THEN 
+         PRINT 8000 , 'SEQUENTIAL' , LRECL
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR LENGTH = ' , I10 )
+         RETURN 
+      END IF
+      WORDS = AI2 * LRECL
+C 
+C INITIALIZE THE SCRATCH ARRAY
+C 
+      DO 100 I = 1 , LRECL
+      A(I) = RAN3 ( IDUM )
+  100 CONTINUE
+C 
+C VAX OPEN STATEMENT :
+C 
+c      OPEN ( UNIT = 2 , FORM = 'UNFORMATTED' , STATUS = 'NEW' , 
+c     +       ACCESS = 'SEQUENTIAL' )
+      OPEN ( UNIT = 2 , FORM = 'UNFORMATTED' , STATUS = 'NEW' , 
+     +       FILE = 'tape2.txt' , ACCESS = 'SEQUENTIAL' )
+C 
+C CREATE A FILE.  THE TIME IT TAKES TO CREATE THE FILE IS UNIMPORTANT.
+C 
+      AMAXSIZ = 1 000 000 000.0D0
+      AIOL = (DBLE(LRECL)  * 8.0D0 * AI2) / AMAXSIZ
+      IOL = MAX(1.0D0,AIOL)
+      I2 = AI2 / IOL
+
+      DO 300 I = 1 , I2 
+      A(LRECL) = I
+      A(1) = LRECL
+      WRITE ( 2 ) A 
+  300 CONTINUE
+      DSAVE = A(1)
+      A(1) = RAN3 ( IDUM )
+      A(LRECL) = RAN3 ( IDUM )
+C 
+C READ THE DATA BACK IN.
+C 
+      REWIND ( 2 )
+C 
+C THE GETWAL ROUTINE RETURNS THE ACCUMULATED WALL TIME
+C 
+      CALL GETWAL ( START ) 
+      ICOUNT = 0
+      DO 410 IJK = 1,IOL
+      DO 400 I = 1 , I2 
+      READ ( 2 ) A
+      IF ( A(1) .NE. DSAVE .OR. A(LRECL) .NE. DBLE(I) ) THEN
+        PRINT *,"Bad read of record number ",I
+        ICOUNT = ICOUNT + 1
+        IF ( ICOUNT .GT. 50 ) THEN
+          PRINT *,"Too man errors, aborting seq read test"
+          RETURN
+        END IF
+      END IF
+  400 CONTINUE
+      REWIND ( 2 )
+  410 CONTINUE
+C 
+C GET THE ENDING WALL TIME
+C 
+      CALL GETWAL ( END ) 
+C 
+C CALCULATE THE TOTAL WALL TIME FOR THE TEST
+C 
+      TIME2 = END - START 
+C 
+C SCRATCH THE FILE
+C 
+      CLOSE ( UNIT = 2 , STATUS = 'DELETE' )
+C 
+C MAKE SURE THAT THE DATA WAS READ CORRECTLY
+C 
+      IF ( A(LRECL) .NE. I2 .OR. A(1) .NE. LRECL ) THEN 
+         PRINT * ,' ERROR : THERE IS SOMETHIN WRONG WITH THE SEQUENTIAL'
+         PRINT * , '         ACCESS OPEN STATEMENT.'
+         PRINT * , '         A(1),A(LRECL),LRECL = ' , A(1) , A(LRECL) ,
+     +   LRECL
+         RETURN 
+      END IF
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'SEQUENTIAL' , LRECL , WORDS / TIME2 
+      WRITE ( 1 , 9000 ) 'SEQUENTIAL' , LRECL , WORDS / TIME2 , 
+     +      I2 , TIME2
+ 9000 FORMAT ( 1X , A20 , I10 , E20.3 , I15 , E20.5 ) 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE AIOTES ( EIOR , A , LRECL )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE I/O RATE FOR ASYNCHRONOUS DIRECT ACCESS 
+C FILES AS A FUNCTION OF RECORD LENGTH
+C 
+C CALLING PARAMETERS :
+C 
+C  EIOR        (REAL) THE ESTIMATED I/O RATE OF THE MACHINE IN WORDS
+C              PER SECOND 
+C 
+C  A           (REAL) SCRATCH ARRAY USED FOR THE I/O TEST 
+C 
+C  LRECL       (INTEGER) THE LENGTH OF THE RECORDS
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(LRECL)
+C 
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF RECORDS THAT THE I/O ROUTINE SHOULD 
+C WRITE TO DISK.  THE GOAL IS TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      AI2 = EIOR * 30.D0 / ( LRECL ) 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( AI2 .LE. 0.D0 .OR. AI2 .GT. 1.D9 ) THEN 
+         PRINT 8000 , 'ASYNCHRONOUS' , LRECL
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR LENGTH = ' , I10 )
+         RETURN 
+      END IF
+      WORDS = AI2 * LRECL
+C 
+C INITIALIZE THE SCRATCH ARRAY
+C 
+      DO 100 I = 1 , LRECL
+      A(I) = RAN3 ( IDUM )
+  100 CONTINUE
+C 
+C INITIALIZE THE FILE : 
+C 
+      CALL ASYNIO ( 2 , LRECL , I2 )
+C 
+C CREATE A FILE.  THE TIME IT TAKES TO CREATE THE FILE IS UNIMPORTANT.
+C 
+      AMAXSIZ = 1 000 000 000.0D0
+      AIOL = (DBLE(LRECL)  * 8.D0 * AI2) / AMAXSIZ
+      IOL = MAX(1.0D0,AIOL)
+      I2 = AI2 / IOL
+      
+      DO 300 I = 1 , I2 
+      A(LRECL) = I
+      A(1) = LRECL
+      CALL ASWRT ( 2 , I , A , LRECL )
+      CALL ASWAIT ( 2 ) 
+  300 CONTINUE
+      DSAVE = A(1)
+      A(1) = RAN3 ( IDUM )
+      A(LRECL) = RAN3 ( IDUM )
+C 
+C READ THE DATA BACK IN.
+C 
+      REWIND ( 2 )
+C 
+C THE GETWAL ROUTINE RETURNS THE ACCUMULATED WALL TIME
+C 
+      CALL GETWAL ( START ) 
+      ICOUNT = 0
+      DO 410 IJK = 1,IOL      
+      DO 400 I = 1 , I2 
+      CALL ASRED ( 2 , I , A , LRECL )
+      CALL ASWAIT ( 2 )
+      IF ( A(1) .NE. DSAVE .OR. A(LRECL) .NE. DBLE(I) ) THEN
+        PRINT *,"Bad read of record number ",I
+        ICOUNT = ICOUNT + 1
+        IF ( ICOUNT .GT. 50 ) THEN
+          PRINT *,"Too man errors, aborting seq read test"
+          RETURN
+        END IF
+      END IF      
+  400 CONTINUE
+      REWIND ( 2 )
+  410 CONTINUE  
+C 
+C GET THE ENDING WALL TIME
+C 
+      CALL GETWAL ( END ) 
+C 
+C CALCULATE THE TOTAL WALL TIME FOR THE TEST
+C 
+      TIME2 = END - START 
+C 
+C SCRATCH THE FILE
+C 
+      CALL ASCLOS ( 2 , 'DELETE' )
+C 
+C MAKE SURE THAT THE DATA WAS READ CORRECTLY
+C 
+      IF ( A(LRECL) .NE. I2 .OR. A(1) .NE. LRECL ) THEN 
+         PRINT *,' ERROR : THERE IS SOMETHIN WRONG WITH THE ASYNCHONOUS'
+         PRINT * , '         ACCESS TEST.'
+         PRINT * , '         A(1),A(LRECL),LRECL = ' , A(1) , A(LRECL) ,
+     +   LRECL
+         RETURN 
+      END IF
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'ASYNCHRONOUS' , LRECL , WORDS / TIME2 
+      WRITE ( 1 , 9000 ) 'ASYNCHRONOUS' , LRECL , WORDS / TIME2 , 
+     +      I2 , TIME2
+ 9000 FORMAT ( 1X , A20 , I10 , E20.3 , I15 , E20.5 ) 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE ASYNIO ( IUNIT , LRECL , NREC )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C ASYNCHONOUS I/O INTERFACE ROUTINE : 
+C 
+C             OPEN A FILE 
+C 
+C CALLING PARAMETERS :
+C 
+C  ( ALL INTEGER )
+C 
+C   IUNIT     THE LOGICAL UNIT NUMBER TO ASSIGN TO THE FILE 
+C 
+C   LRECL     THE LENGTH OF THE RECORDS TO BE WRITTEN IN FLOATING 
+C             POINT WORDS 
+C 
+C   NREC      THE NUMBER OF RECORDS (OF LENGTH LRECL) THAT THE FILE 
+C             WILL HOLD 
+C 
+C ******************************************************************
+C 
+C 
+      OPEN ( UNIT = IUNIT , FORM = 'UNFORMATTED' , STATUS = 'NEW' , 
+     +       FILE = 'tape2.txt' , ACCESS = 'SEQUENTIAL' ,
+     +       ASYNCHRONOUS='YES')
+      RETURN
+      END 
+      SUBROUTINE ASRED ( IUNIT , IREC , A , LRECL ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C ASYNCHONOUS I/O INTERFACE ROUTINE : 
+C 
+C             READ A RECORD 
+C 
+C CALLING PARAMETERS :
+C 
+C   IUNIT     (INTEGER) THE LOGICAL UNIT NUMBER TO ASSIGN TO THE FILE 
+C 
+C   IREC      (INTEGER) THE NUMBER OF THE RECORD TO BE READ 
+C 
+C   A         (REAL) A SCRATCH ARRAY TO READ THE DATA INTO
+C 
+C   LRECL     (INTEGER) THE LENGTH OF THE RECORD
+C 
+C ******************************************************************
+C 
+      DIMENSION A(LRECL)
+C 
+      READ ( IUNIT , ASYNCHRONOUS='YES') A
+      RETURN
+      END 
+      SUBROUTINE ASWRT ( IUNIT , IREC , A , LRECL ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C ASYNCHONOUS I/O INTERFACE ROUTINE : 
+C 
+C             WRITE A RECORD
+C 
+C CALLING PARAMETERS :
+C 
+C   IUNIT     (INTEGER) THE LOGICAL UNIT NUMBER TO ASSIGN TO THE FILE 
+C 
+C   IREC      (INTEGER) THE NUMBER OF THE RECORD TO BE WRITTEN
+C 
+C   A         (REAL) A SCRATCH ARRAY TO WRITE THE DATA FROM 
+C 
+C   LRECL     (INTEGER) THE LENGTH OF THE RECORD
+C 
+C ******************************************************************
+C 
+      DIMENSION A(LRECL)
+C 
+      WRITE ( IUNIT , ASYNCHRONOUS='YES') A
+      RETURN
+      END 
+      SUBROUTINE ASCLOS ( IUNIT , AOP ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+      CHARACTER(*) AOP
+C 
+C ASYNCHONOUS I/O INTERFACE ROUTINE : 
+C 
+C             CLOSE AND DELETE A FILE 
+C 
+C CALLING PARAMETERS :
+C 
+C   IUNIT     (INTEGER) THE LOGICAL UNIT NUMBER TO ASSIGN TO THE FILE 
+C 
+C   AOP       (CHARACTER) THE OPERATION TO BE PERFORMED 
+C 
+C ******************************************************************
+C 
+C 
+      CLOSE ( UNIT = IUNIT , STATUS = AOP )
+      RETURN
+      END 
+      SUBROUTINE ASWAIT ( IUNIT ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C ASYNCHONOUS I/O INTERFACE ROUTINE : 
+C 
+C             WAIT FOR AN ASYNCHONOUS OPERATION TO COMPLETE 
+C 
+C CALLING PARAMETERS :
+C 
+C   IUNIT     (INTEGER) THE LOGICAL UNIT NUMBER ASSIGNED TO THE FILE
+C 
+C ******************************************************************
+C 
+C 
+      WAIT(IUNIT)
+      RETURN
+      END 
+      SUBROUTINE RMVTES ( EVFR , A , B , C , IDIM ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE FLOP RATE FOR THE MATRIX-VECTOR MULTIPLY
+C AS A FUNCTION OF VECTOR LENGTH
+C 
+C CALLING PARAMETERS :
+C 
+C  EVFR        (REAL) THE ESTIMATED VECTOR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (REAL) SCRATCH ARRAY USED FOR THE MATRIX 
+C 
+C  B           (REAL) SCRATCH ARRAY USED FOR THE VECTOR 
+C 
+C  C           (REAL) SCRATCH ARRAY USED FOR THE SECOND VECTOR
+C 
+C  IDIM        (INTEGER) THE LENGTH OF THE VECTOR 
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(IDIM,IDIM)
+      DIMENSION B(IDIM) 
+      DIMENSION C(IDIM) 
+C 
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE MATRIX ROUTINE SHOULD BE 
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      I2 = EVFR * 30.D0 / ( 2.D0 * DFLOAT ( IDIM ) * DFLOAT ( IDIM ) )
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( I2 .LE. 0 ) THEN 
+         PRINT 8000 , 'RVMUL' , IDIM
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR DIMENSION = ' , I10 ) 
+         RETURN 
+      END IF
+      FLOPS = DFLOAT(I2) * 2.D0 * DFLOAT ( IDIM ) * DFLOAT ( IDIM )
+C 
+C INITIALIZE THE SCRATCH ARRAYS 
+C 
+      DO 110 I = 1 , IDIM 
+         B(I) = RAN3 ( IDUM ) 
+         C(I) = 0.0 
+         DO 100 J = 1 , IDIM
+            A(J,I) = RAN3 ( IDUM )
+  100    CONTINUE 
+  110 CONTINUE
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 200 I = 1 , I2 
+      CALL RMVMUL ( A , B , C , IDIM )
+  200 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'RVMUL' , IDIM  , FLOPS / TIME1
+      WRITE ( 1 , 9000 ) 'RVMUL' , IDIM  , FLOPS / TIME1
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , I10 , E20.3 , I15 , E20.5 ) 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE RMMTES ( EVFR , A , B , C , IDIM ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE FLOP RATE FOR THE MATRIX-MATRIX MULTIPLY
+C AS A FUNCTION OF MATRIX ORDER 
+C 
+C CALLING PARAMETERS :
+C 
+C  EVFR        (REAL) THE ESTIMATED VECTOR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (REAL) SCRATCH ARRAY USED FOR THE FIRST MATRIX 
+C 
+C  B           (REAL) SCRATCH ARRAY USED FOR THE SECOND MATRIX
+C 
+C  C           (REAL) SCRATCH ARRAY USED FOR THE THIRD MATRIX 
+C 
+C  IDIM        (INTEGER) THE DIMENSION OF THE MATRIX
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(IDIM,IDIM)
+      DIMENSION B(IDIM,IDIM)
+      DIMENSION C(IDIM,IDIM)
+C 
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE MATRIX ROUTINE SHOULD BE 
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      I2 = EVFR * 30.D0 / ( 2.D0 * DFLOAT ( IDIM ) * DFLOAT ( IDIM ) * 
+     +     DFLOAT ( IDIM ) ) 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( I2 .LE. 0 ) THEN 
+         PRINT 8000 , 'RMMMUL' , IDIM 
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR DIMENSION = ' , I10 ) 
+         RETURN 
+      END IF
+      FLOPS = DFLOAT(I2) * 2.D0 * DFLOAT ( IDIM ) * DFLOAT ( IDIM ) * 
+     +        DFLOAT ( IDIM ) 
+C 
+C INITIALIZE THE SCRATCH ARRAYS 
+C 
+      DO 110 I = 1 , IDIM 
+         DO 100 J = 1 , IDIM
+            A(J,I) = RAN3 ( IDUM )
+            B(J,I) = RAN3 ( IDUM )
+            C(J,I) = 0.0D0
+  100    CONTINUE 
+  110 CONTINUE
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 200 I = 1 , I2 
+      CALL RMMMUL ( A , B , C , IDIM )
+  200 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'RMMMUL' , IDIM  , FLOPS / TIME1 
+      WRITE ( 1 , 9000 ) 'RMMMUL' , IDIM  , FLOPS / TIME1 
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , I10 , E20.3 , I15 , E20.5 ) 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE RMVMUL ( A , B , C , IDIM )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS SUBROUTINE MULTIPLIES A MATRIX BY A VECTOR 
+C 
+C CALLING PARAMETERS :
+C 
+C  A           (REAL) THE MATRIX
+C 
+C  B           (REAL) THE VECTOR TO MULTIPLY
+C 
+C  C           (REAL) THE VECTOR RESULT 
+C 
+C  IDIM        (INTEGER) THE DIMENSION OF THE MATRIX
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(IDIM,IDIM)
+      DIMENSION B(IDIM) 
+      DIMENSION C(IDIM) 
+C 
+C 
+C POST MULTIPLY THE MATRIX BY THE COLUMN VECTOR 
+C 
+      DO 200 I = 1 , IDIM 
+         DO 100 J = 1 , IDIM
+            C(I) = C(I) + A(I,J) * B(J) 
+  100    CONTINUE 
+  200 CONTINUE
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE RMMMUL ( A , B , C , IDIM )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS SUBROUTINE MULTIPLIES A MATRIX BY A MATRIX 
+C 
+C CALLING PARAMETERS :
+C 
+C  A           (REAL) THE FIRST MATRIX
+C 
+C  B           (REAL) THE MATRIX TO MULTIPLY
+C 
+C  C           (REAL) THE MATRIX RESULT 
+C 
+C  IDIM        (INTEGER) THE DIMENSION OF THE MATRICIES 
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(IDIM,IDIM)
+      DIMENSION B(IDIM,IDIM)
+      DIMENSION C(IDIM,IDIM)
+C 
+C 
+C POST MULTIPLY THE FIRST MATRIX BY THE SECOND MATRIX 
+C 
+      DO 300 J = 1 , IDIM 
+         DO 200 I = 1 , IDIM
+            DO 100 K = 1 , IDIM 
+               C(I,J) = C(I,J) + A(I,K) * B(K,J)
+  100       CONTINUE
+  200    CONTINUE 
+  300 CONTINUE
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE CMVTES ( EVFR , A , B , C , IDIM ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE FLOP RATE FOR THE COMPLEX MATRIX-VECTOR 
+C MULTIPLY AS A FUNCTION OF VECTOR LENGTH 
+C 
+C CALLING PARAMETERS :
+C 
+C  EVFR        (REAL) THE ESTIMATED VECTOR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (COMPLEX) SCRATCH ARRAY USED FOR THE MATRIX
+C 
+C  B           (COMPLEX) SCRATCH ARRAY USED FOR THE VECTOR
+C 
+C  C           (COMPLEX) SCRATCH ARRAY USED FOR THE SECOND VECTOR 
+C 
+C  IDIM        (INTEGER) THE LENGTH OF THE VECTOR 
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(IDIM,IDIM)
+      DIMENSION B(IDIM) 
+      DIMENSION C(IDIM) 
+C 
+      COMPLEX*16 A
+      COMPLEX*16 B
+      COMPLEX*16 C
+C 
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE MATRIX ROUTINE SHOULD BE 
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      I2 = EVFR * 30.D0 / ( 8.D0 * DFLOAT ( IDIM ) * DFLOAT ( IDIM ) ) 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( I2 .LE. 0 ) THEN 
+         PRINT 8000 , 'CVMUL' , IDIM
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR DIMENSION = ' , I10 ) 
+         RETURN 
+      END IF
+      FLOPS = DFLOAT(I2) * 8.D0 * DFLOAT ( IDIM ) * DFLOAT ( IDIM )
+C 
+C INITIALIZE THE SCRATCH ARRAYS 
+C 
+      DO 110 I = 1 , IDIM 
+         B(I) = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) )
+         C(I) = ( 0.0D0 , 0.0D0 ) 
+         DO 100 J = 1 , IDIM
+            A(J,I) = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) ) 
+  100    CONTINUE 
+  110 CONTINUE
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 200 I = 1 , I2 
+      CALL CMVMUL ( A , B , C , IDIM )
+  200 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'CVMUL' , IDIM  , FLOPS / TIME1
+      WRITE ( 1 , 9000 ) 'CVMUL' , IDIM  , FLOPS / TIME1
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , I10 , E20.3 , I15 , E20.5 ) 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE CMMTES ( EVFR , A , B , C , IDIM ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE FLOP RATE FOR THE COMPLEX MATRIX-MATRIX 
+C MULTIPLY AS A FUNCTION OF MATRIX ORDER
+C 
+C CALLING PARAMETERS :
+C 
+C  EVFR        (REAL) THE ESTIMATED VECTOR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (COMPLEX) SCRATCH ARRAY USED FOR THE FIRST MATRIX
+C 
+C  B           (COMPLEX) SCRATCH ARRAY USED FOR THE SECOND MATRIX 
+C 
+C  C           (COMPLEX) SCRATCH ARRAY USED FOR THE THIRD MATRIX
+C 
+C  IDIM        (INTEGER) THE DIMENSION OF THE MATRIX
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(IDIM,IDIM)
+      DIMENSION B(IDIM,IDIM)
+      DIMENSION C(IDIM,IDIM)
+C 
+      COMPLEX*16 A
+      COMPLEX*16 B
+      COMPLEX*16 C
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE MATRIX ROUTINE SHOULD BE 
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      I2 = EVFR * 30.D0 / ( 8.D0 * DFLOAT ( IDIM ) * DFLOAT ( IDIM ) * 
+     +     DFLOAT ( IDIM ) ) 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( I2 .LE. 0 ) THEN 
+         PRINT 8000 , 'CMMMUL' , IDIM 
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR DIMENSION = ' , I10 ) 
+         RETURN 
+      END IF
+      FLOPS = DFLOAT(I2) * 8.D0 * DFLOAT ( IDIM ) * DFLOAT ( IDIM ) * 
+     +        DFLOAT ( IDIM ) 
+C 
+C INITIALIZE THE SCRATCH ARRAYS 
+C 
+      DO 110 I = 1 , IDIM 
+         DO 100 J = 1 , IDIM
+            A(J,I) = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) ) 
+            B(J,I) = DCMPLX ( RAN3 ( IDUM ) , RAN3 ( IDUM ) ) 
+            C(J,I) = ( 0.0D0 , 0.0D0 )
+  100    CONTINUE 
+  110 CONTINUE
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 200 I = 1 , I2 
+      CALL CMMMUL ( A , B , C , IDIM )
+  200 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'CMMMUL' , IDIM  , FLOPS / TIME1 
+      WRITE ( 1 , 9000 ) 'CMMMUL' , IDIM  , FLOPS / TIME1 
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , I10 , E20.3 , I15 , E20.5 ) 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE CMVMUL ( A , B , C , IDIM )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS SUBROUTINE MULTIPLIES A COMPLEX MATRIX BY A COMPLEX VECTOR 
+C 
+C CALLING PARAMETERS :
+C 
+C  A           (COMPLEX) THE MATRIX 
+C 
+C  B           (COMPLEX) THE VECTOR TO MULTIPLY 
+C 
+C  C           (COMPLEX) THE VECTOR RESULT
+C 
+C  IDIM        (INTEGER) THE DIMENSION OF THE MATRIX
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(IDIM,IDIM)
+      DIMENSION B(IDIM) 
+      DIMENSION C(IDIM) 
+C 
+      COMPLEX*16 A
+      COMPLEX*16 B
+      COMPLEX*16 C
+C 
+C 
+C POST MULTIPLY THE MATRIX BY THE COLUMN VECTOR 
+C 
+      DO 200 I = 1 , IDIM 
+         DO 100 J = 1 , IDIM
+            C(I) = C(I) + A(I,J) * B(J) 
+  100    CONTINUE 
+  200 CONTINUE
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE CMMMUL ( A , B , C , IDIM )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS SUBROUTINE MULTIPLIES A COMPLEX MATRIX BY A COMPLEX MATRIX 
+C 
+C CALLING PARAMETERS :
+C 
+C  A           (COMPLEX) THE FIRST MATRIX 
+C 
+C  B           (COMPLEX) THE MATRIX TO MULTIPLY 
+C 
+C  C           (COMPLEX) THE MATRIX RESULT
+C 
+C  IDIM        (INTEGER) THE DIMENSION OF THE MATRICIES 
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(IDIM,IDIM)
+      DIMENSION B(IDIM,IDIM)
+      DIMENSION C(IDIM,IDIM)
+C 
+      COMPLEX*16 A
+      COMPLEX*16 B
+      COMPLEX*16 C
+C 
+C 
+C POST MULTIPLY THE FIRST MATRIX BY THE SECOND MATRIX 
+C 
+      DO 300 J = 1 , IDIM 
+         DO 200 I = 1 , IDIM
+            DO 100 K = 1 , IDIM 
+               C(I,J) = C(I,J) + A(I,K) * B(K,J)
+  100       CONTINUE
+  200    CONTINUE 
+  300 CONTINUE
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE HANTES ( ESFR )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE EXECUTION RATE FOR HANKEL FUNCTIONS 
+C 
+C CALLING PARAMETER : 
+C 
+C  ESFR        (REAL) THE ESTIMATED SCALAR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      AI2 = ESFR * 30.D0 / 90.D0
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( AI2 .LE. 0.D0 ) THEN 
+         PRINT 8000 , 'HANKEL'
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +   )
+         RETURN 
+      END IF
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      SUMX = 0.D0
+      SUMY = 0.D0
+      ARG1 = 4.D0
+      ARG2 = 0.5D0
+      I2 = AI2
+      CALL GETSEC ( START ) 
+C 
+C RUN THE TEST
+C 
+      DO 500 I = 1 , I2 
+      SUMX = 0.D0
+      SUMY = 0.D0
+      CALL J0Y0 ( ARG1 , X , Y ) 
+      SUMX = SUMX + X
+      SUMY = SUMY + Y
+      CALL J0Y0 ( ARG2 , X , Y ) 
+      SUMX = SUMX + Y
+      SUMY = SUMY + X
+c note : all of this trash is just to try to keep smart optimizers from
+c        optimizing out the entire loop
+      if ( SUMX .gt. 1.d6 .or. SUMX .lt. 0.d0 ) SUMX = 0.d0
+      if ( ABS(SUMX) .lt. 1.d-16 ) SUMX = 0.d0
+      if ( SUMY .gt. 1.d6 .or. SUMY .lt. 0.d0 ) SUMY = 0.d0
+      if ( ABS(SUMY) .lt. 1.d-16 ) SUMY = 0.d0
+      ARG1 = 4.d0 + SUMY
+      ARG2 = 0.5d0 + SUMX
+  500 CONTINUE
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( END ) 
+C 
+C WRITE THE REPORT
+C 
+      TIME3 = END - START 
+      WRITE ( * , 9000 ) 'HANKEL' , I2 * 2 / TIME3
+      WRITE ( 1 , 9000 ) 'HANKEL' , I2 * 2 / TIME3
+     +   , I2 , TIME3 , SUMX , SUMY , X , Y
+ 9000 FORMAT ( 1X , A20 , E20.3 , I15 , E20.5 ,
+     +        ",DUM= ",4E17.2) 
+C 
+C  R  E  T  U  R  N 
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE SCATES ( ESFR )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE SCALAR FLOP RATE
+C 
+C CALLING PARAMETER : 
+C 
+C  ESFR        (REAL) THE ESTIMATED SCALAR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      AI2 = ESFR * 30.D0 / 59.D0 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( AI2 .LE. 0.D0 ) THEN 
+         PRINT 8000 , 'SCALAR'
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +   )
+         RETURN 
+      END IF
+C 
+C CALCULATE THE TOTAL NUMBER OF FLOPS TO BE RUN 
+C 
+      SUMX = 0.D0
+      SUMY = 0.D0
+      ARG = 3.0D0
+      I2 = AI2
+      FLOPS = DFLOAT(I2) * 66.D0 
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C RUN THE TEST
+C 
+      DO 500 I = 1 , I2 
+      CALL SCAL ( ARG , X , Y ) 
+c note : all of this trash is just to try to keep smart optimizers from
+c        optimizing out the entire loop
+      SUMX = SUMX + X
+      if ( SUMX .gt. 1.d16 .or. SUMX .lt. -1.d16 ) SUMX = 0.d0
+      if ( ABS(SUMX) .lt. 1.d-16 ) SUMX = 0.d0
+      SUMY = SUMY + Y
+      if ( SUMY .gt. 1.d16 .or. SUMY .lt. -1.d16 ) SUMY = 0.d0
+      if ( ABS(SUMY) .lt. 1.d-16 ) SUMY = 0.d0
+      ARG = ARG + SUMX +  SUMY
+  500 CONTINUE
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( END ) 
+C 
+C WRITE THE REPORT
+C 
+      TIME3 = END - START 
+      WRITE ( * , 9000 ) 'SCALAR' , FLOPS / TIME3 
+      WRITE ( 1 , 9000 ) 'SCALAR' , FLOPS / TIME3 
+     +   , I2 , TIME3 , ARG
+ 9000 FORMAT ( 1X , A20 , E20.3 , I15 , E20.5,"ARG=", E20.5)
+C 
+C  R  E  T  U  R  N 
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE P2CALL ( ESFR , FUNCT , FNAME , ARG1 , ARG2 )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE EXECUTION RATE FOR 2 ARGUMENT FUNCTIONS 
+C 
+C CALLING PARAMETERS :
+C 
+C  ESFR        (REAL) THE ESTIMATED SCALAR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  FUNCT       (EXTERNAL) THE FUNCTION TO BE TESTED 
+C 
+C  FNAME       (CHARACTER) THE NAME OF THE FUNCTION 
+C 
+C  ARG1        (REAL) THE FIRST ARGUMENT
+C 
+C  ARG2        (REAL) THE SECOND ARGUMENT 
+C 
+C --------------------------------------------------------------------- 
+C 
+      CHARACTER*(*) FNAME 
+C 
+      I2 = ESFR * 30.D0 / 16.D0 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( I2 .LE. 0 ) THEN 
+         PRINT 8000 , FNAME 
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +   )
+         RETURN 
+      END IF
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C RUN THE TEST
+C 
+      DO 500 I = 1 , I2 
+      DUMMY = FUNCT ( ARG1 , ARG2 ) 
+  500 CONTINUE
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( END ) 
+C 
+C WRITE THE REPORT
+C 
+      TIME3 = END - START 
+      WRITE ( * , 9000 ) FNAME , I2 / TIME3 
+      WRITE ( 1 , 9000 ) FNAME , I2 / TIME3 
+     +   , I2 , TIME3 
+ 9000 FORMAT ( 1X , A20 , E20.3 , I15 , E20.5 ) 
+C 
+C  R  E  T  U  R  N 
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE P1CALL ( ESFR , FUNCT , FNAME , ARG )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE EXECUTION RATE FOR 1 ARGUMENT FUNCTIONS 
+C 
+C CALLING PARAMETERS :
+C 
+C  ESFR        (REAL) THE ESTIMATED SCALAR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  FUNCT       (EXTERNAL) THE FUNCTION TO BE TESTED 
+C 
+C  FNAME       (CHARACTER) THE NAME OF THE FUNCTION 
+C 
+C  ARG         (REAL) THE ARGUMENT
+C 
+C --------------------------------------------------------------------- 
+C 
+      CHARACTER*(*) FNAME 
+C 
+      I2 = ESFR * 30.D0 / 16.D0 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( I2 .LE. 0 ) THEN 
+         PRINT 8000 , FNAME 
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +   )
+         RETURN 
+      END IF
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C RUN THE TEST
+C 
+      DO 500 I = 1 , I2 
+      DUMMY = FUNCT ( ARG ) 
+  500 CONTINUE
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( END ) 
+C 
+C WRITE THE REPORT
+C 
+      TIME3 = END - START 
+      WRITE ( * , 9000 ) FNAME , I2 / TIME3 
+      WRITE ( 1 , 9000 ) FNAME , I2 / TIME3 
+     +   , I2 , TIME3 
+ 9000 FORMAT ( 1X , A20 , E20.3 , I15 , E20.5 ) 
+C 
+C  R  E  T  U  R  N 
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE ANTES ( ESFR , A , B , MAXLEN )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE EXECUTION RATE FOR THE ANTI-LOG FUNCTION
+C 
+C CALLING PARAMETERS :
+C 
+C  ESFR        (REAL) THE ESTIMATED SCALAR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (REAL) SCRATCH ARRAY USED FOR THE TEST 
+C 
+C  B           (REAL) SECOND SCRATCH ARRAY
+C 
+C  MAXLEN      (INTEGER) THE LENGTH OF THE SCRATCH ARRAYS 
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(MAXLEN) 
+      DIMENSION B(MAXLEN) 
+C 
+C 
+C 
+C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
+C 
+      DATA IDUM / 1234567 / 
+C 
+C 
+C 
+C INITIALIZE THE SCRATCH VECTOR 
+C 
+      DO 100 I = 1 , MAXLEN 
+      B(I) = RAN3 ( IDUM ) * 10.0D0 - 5.0D0 
+  100 CONTINUE
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE VECTOR ROUTINE SHOULD BE 
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      I2 = ESFR * 30.D0 / MAXLEN / 32.D0
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( I2 .LE. 0 ) THEN 
+         PRINT 8000 , 'ANTI-LOG' , MAXLEN 
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR LENGTH = ' , I10 )
+         RETURN 
+      END IF
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 200 I = 1 , I2 
+         CALL ANTES2 ( A , B , MAXLEN ) 
+  200 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'ANT-LOG' , MAXLEN , I2 * MAXLEN / TIME1 
+      WRITE ( 1 , 9000 ) 'ANT-LOG' , MAXLEN , I2 * MAXLEN / TIME1 
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , I10 , E20.3 , I15 , E20.5 ) 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE ANTES2 ( A , B , MAXLEN )
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE IN CONJUNCTION WITH THE ANTES SUBROUTINE TO CALCULATE
+C THE EXECUTION RATE FOR THE ANTI-LOG FUNCTION
+C 
+C CALLING PARAMETERS :
+C 
+C 
+C  A           (REAL) SCRATCH ARRAY USED FOR THE TEST 
+C 
+C  B           (REAL) SECOND SCRATCH ARRAY
+C 
+C  MAXLEN      (INTEGER) THE LENGTH OF THE SCRATCH ARRAYS 
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(MAXLEN) 
+      DIMENSION B(MAXLEN) 
+C 
+C 
+C 
+C 
+         DO 200 J = 1 , MAXLEN
+            A(J) = 10.0D0 ** B(J) 
+  200    CONTINUE 
+C 
+C   R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      DOUBLE PRECISION FUNCTION RAN3(IDUM)
+C-----------------------------------------------------------------------
+C      THE FOLLOWING ROUTINE IS A RANDOM NUMBER GENERATOR COPIED FROM 
+C    'NUMERICAL RECIPES' BY FLANNERY, TEUKOLSKY AND VETTERLING
+C    P. 199 
+C-----------------------------------------------------------------------
+      IMPLICIT DOUBLE PRECISION (A-H,M,O-Z) 
+      PARAMETER (MBIG = 4000000.0D0, MSEED = 1618033.0D0) 
+      PARAMETER (MZ = 0.0D0, FAC = 1.0D0 / MBIG)
+C 
+C DO NOT MODIFY 55
+C 
+      DIMENSION MA(55)
+      SAVE IFF,INEXT,INEXTP,MA
+      DATA IFF / 0 /
+C 
+C      =================================================================
+C     IF FIRST TIME, INITIALIZE TABLE, SLIGHTLY RANDOM ORDER
+C      =================================================================
+C 
+      IF (IDUM .LT. 0 .OR. IFF .EQ. 0) THEN 
+         IFF = 1
+         MJ = MSEED - IABS(IDUM)
+         MJ = MOD(MJ,MBIG)
+         MA(55) = MJ
+         MK = 1.0D0 
+         DO 100 I = 1, 54 
+            II = MOD(21 * I,55) 
+            MA(II) = MK 
+            MK = MJ - MK
+            IF (MK .LT. MZ) MK = MK + MBIG
+            MJ = MA(II) 
+ 100     CONTINUE 
+C 
+C      =================================================================
+C     RANDOMIZE TABLE, DO NOT CHANGE OFFSET (INEXTP = 31) 
+C      =================================================================
+C 
+         DO 200 K = 1, 4
+            DO 300 I = 1, 55
+               MA(I) = MA(I) - MA(1 + MOD(I + 30,55)) 
+               IF (MA(I) .LT. MZ) MA(I) = MA(I) + MBIG
+ 300        CONTINUE
+ 200     CONTINUE 
+         INEXT  = 0 
+         INEXTP = 31
+         IDUM   = 1 
+      ENDIF 
+      INEXT = INEXT + 1 
+      IF (INEXT .EQ. 56) INEXT = 1
+      INEXTP = INEXTP + 1 
+      IF (INEXTP .EQ. 56) INEXTP = 1
+      MJ = MA(INEXT) - MA(INEXTP) 
+      IF (MJ .LT. MZ) MJ = MJ + MBIG
+      MA(INEXT) = MJ
+      RAN3 = MJ * FAC 
+      RETURN
+      END 
+      REAL FUNCTION SECOND ( DUM )
+      SAVE
+      SECOND = mclock() * 0.001
+      RETURN
+      END 
+      SUBROUTINE DAXPY(N,DA,DX,INCX,DY,INCY)
+C 
+C     CONSTANT TIMES A VECTOR PLUS A VECTOR.
+C     USES UNROLLED LOOPS FOR INCREMENTS EQUAL TO ONE.
+C     JACK DONGARRA, LINPACK, 3/11/78.
+C 
+      DOUBLE PRECISION DX(1),DY(1),DA 
+      INTEGER I,INCX,INCY,IXIY,M,MP1,N
+C 
+      IF(N.LE.0)RETURN
+      IF (DA .EQ. 0.0D0) RETURN 
+      IF(INCX.EQ.1.AND.INCY.EQ.1)GO TO 20 
+C 
+C        CODE FOR UNEQUAL INCREMENTS OR EQUAL INCREMENTS
+C          NOT EQUAL TO 1 
+C 
+      IX = 1
+      IY = 1
+      IF(INCX.LT.0)IX = (-N+1)*INCX + 1 
+      IF(INCY.LT.0)IY = (-N+1)*INCY + 1 
+      DO 10 I = 1,N 
+        DY(IY) = DY(IY) + DA*DX(IX) 
+        IX = IX + INCX
+        IY = IY + INCY
+   10 CONTINUE
+      RETURN
+C 
+C        CODE FOR BOTH INCREMENTS EQUAL TO 1
+C 
+C 
+C        CLEAN-UP LOOP
+C 
+   20 M = MOD(N,4)
+      IF( M .EQ. 0 ) GO TO 40 
+      DO 30 I = 1,M 
+        DY(I) = DY(I) + DA*DX(I)
+   30 CONTINUE
+      IF( N .LT. 4 ) RETURN 
+   40 MP1 = M + 1 
+      DO 50 I = MP1,N,4 
+        DY(I) = DY(I) + DA*DX(I)
+        DY(I + 1) = DY(I + 1) + DA*DX(I + 1)
+        DY(I + 2) = DY(I + 2) + DA*DX(I + 2)
+        DY(I + 3) = DY(I + 3) + DA*DX(I + 3)
+   50 CONTINUE
+      RETURN
+      END 
+      DOUBLE PRECISION FUNCTION DDOT(N,DX,INCX,DY,INCY) 
+C 
+C     FORMS THE DOT PRODUCT OF TWO VECTORS. 
+C     USES UNROLLED LOOPS FOR INCREMENTS EQUAL TO ONE.
+C     JACK DONGARRA, LINPACK, 3/11/78.
+C 
+      DOUBLE PRECISION DX(1),DY(1),DTEMP
+      INTEGER I,INCX,INCY,IX,IY,M,MP1,N 
+C 
+      DDOT = 0.0D0
+      DTEMP = 0.0D0 
+      IF(N.LE.0)RETURN
+      IF(INCX.EQ.1.AND.INCY.EQ.1)GO TO 20 
+C 
+C        CODE FOR UNEQUAL INCREMENTS OR EQUAL INCREMENTS
+C          NOT EQUAL TO 1 
+C 
+      IX = 1
+      IY = 1
+      IF(INCX.LT.0)IX = (-N+1)*INCX + 1 
+      IF(INCY.LT.0)IY = (-N+1)*INCY + 1 
+      DO 10 I = 1,N 
+        DTEMP = DTEMP + DX(IX)*DY(IY) 
+        IX = IX + INCX
+        IY = IY + INCY
+   10 CONTINUE
+      DDOT = DTEMP
+      RETURN
+C 
+C        CODE FOR BOTH INCREMENTS EQUAL TO 1
+C 
+C 
+C        CLEAN-UP LOOP
+C 
+   20 M = MOD(N,5)
+      IF( M .EQ. 0 ) GO TO 40 
+      DO 30 I = 1,M 
+        DTEMP = DTEMP + DX(I)*DY(I) 
+   30 CONTINUE
+      IF( N .LT. 5 ) GO TO 60 
+   40 MP1 = M + 1 
+      DO 50 I = MP1,N,5 
+        DTEMP = DTEMP + DX(I)*DY(I) + DX(I + 1)*DY(I + 1) + 
+     *   DX(I + 2)*DY(I + 2) + DX(I + 3)*DY(I + 3) + DX(I + 4)*DY(I + 4)
+   50 CONTINUE
+   60 DDOT = DTEMP
+      RETURN
+      END 
+      SUBROUTINE ZAXPY(N,ZA,ZX,INCX,ZY,INCY)
+C 
+C     CONSTANT TIMES A VECTOR PLUS A VECTOR.
+C     JACK DONGARRA, 3/11/78. 
+C
+      double precision CDABS1 
+      COMPLEX*16 ZX(1),ZY(1),ZA 
+      IF(N.LE.0)RETURN
+      IF (CDABS1(ZA) .EQ. 0.0D0) RETURN 
+      IF (INCX.EQ.1.AND.INCY.EQ.1)GO TO 20
+C 
+C        CODE FOR UNEQUAL INCREMENTS OR EQUAL INCREMENTS
+C          NOT EQUAL TO 1 
+C 
+      IX = 1
+      IY = 1
+      IF(INCX.LT.0)IX = (-N+1)*INCX + 1 
+      IF(INCY.LT.0)IY = (-N+1)*INCY + 1 
+      DO 10 I = 1,N 
+        ZY(IY) = ZY(IY) + ZA*ZX(IX) 
+        IX = IX + INCX
+        IY = IY + INCY
+   10 CONTINUE
+      RETURN
+C 
+C        CODE FOR BOTH INCREMENTS EQUAL TO 1
+C 
+   20 DO 30 I = 1,N 
+        ZY(I) = ZY(I) + ZA*ZX(I)
+   30 CONTINUE
+      RETURN
+      END 
+      DOUBLE COMPLEX FUNCTION ZDOTU(N,ZX,INCX,ZY,INCY)
+C 
+C     FORMS THE DOT PRODUCT OF A VECTOR.
+C     JACK DONGARRA, 3/11/78. 
+C 
+      COMPLEX*16 ZX(1),ZY(1),ZTEMP
+      ZTEMP = (0.0D0,0.0D0) 
+      ZDOTU = (0.0D0,0.0D0) 
+      IF(N.LE.0)RETURN
+      IF(INCX.EQ.1.AND.INCY.EQ.1)GO TO 20 
+C 
+C        CODE FOR UNEQUAL INCREMENTS OR EQUAL INCREMENTS
+C          NOT EQUAL TO 1 
+C 
+      IX = 1
+      IY = 1
+      IF(INCX.LT.0)IX = (-N+1)*INCX + 1 
+      IF(INCY.LT.0)IY = (-N+1)*INCY + 1 
+      DO 10 I = 1,N 
+        ZTEMP = ZTEMP + ZX(IX)*ZY(IY) 
+        IX = IX + INCX
+        IY = IY + INCY
+   10 CONTINUE
+      ZDOTU = ZTEMP 
+      RETURN
+C 
+C        CODE FOR BOTH INCREMENTS EQUAL TO 1
+C 
+   20 DO 30 I = 1,N 
+        ZTEMP = ZTEMP + ZX(I)*ZY(I) 
+   30 CONTINUE
+      ZDOTU = ZTEMP 
+      RETURN
+      END 
+      SUBROUTINE WHETS ( I , IOL)
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C WHETSTONE BENCHMARK PROGRAM 
+C 
+C THIS PROGRAM USES A CAREFULLY CHOSEN MIX OF INSTRUCTIONS TYPICAL OF 
+C SCIENTIFIC (FLOATING POINT) CALCULATIONS
+C 
+C SEE H.J. CURNOW AND B.A. WICHMANN,
+C "A SYNTHETIC BENCHMARK", COMPUTER J., V19 #1, FEB. 1976, PP. 43-49. 
+C 
+C TABLE OF TIMES FOR VARIOUS COMPUTERS IN <INFO-IBMPC>WHETST.ANSWERS
+C COMPILED BY RICHARD GILLMANN (GILLMANN@ISIB)
+C 
+      DOUBLE PRECISION X1,X2,X3,X4,X,Y,Z,T,T1,T2,E1 
+      COMMON T,T1,T2,E1(4),J,K,L
+C I=10 CORRESPONDS TO ONE MILLION WHETSTONE INSTRUCTIONS
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( I .LE. 0 ) THEN
+         PRINT 8000 , 'WHETSTONE' , ILEN
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR I = ' , I10 ) 
+         RETURN 
+      END IF
+      ASAVE = DBLE(I) * DBLE(IOL) 
+      CALL GETSEC ( START )
+      do 1001 IJK = 1 , IOL 
+c initialise constants
+CJK   I=10
+c read value of i, controlling total weight: if i=10 the
+c total weight is one million Whetstone instructions
+CJK   T1=050025000
+      T1=0.50025000D0 
+      T=0.499975000D0 
+      T2=2.0000D0 
+      N1=0
+      N2=12*I 
+      N3=14*I 
+CJK   N4=348*I
+      N4=345*I
+      N5=0
+      N6=210*I
+      N7=32*I 
+      N8=899*I
+CJK   N9=516*I
+      N9=616*I
+      N10=0 
+      N11=93*I
+      N12=0 
+c module 1: simple identifiers
+      X1=1.0D0
+      X2=-1.0D0 
+      X3=-1.0D0 
+      X4=-1.0D0
+c note that the Whetstone code is hard coded to skip this test
+c a good compiler will optimize this out...
+      IF(N1)19,19,11
+   11 DO 18 I=1,N1,1
+      X1=(X1+X2+X3-X4)*T
+      X2=(X1+X2-X3+X4)*T
+      X3=(X1-X2+X3+X4)*T
+      X4=(-X1+X2+X3+X4)*T 
+   18 CONTINUE
+   19 CONTINUE
+      CALL POUT(1,N1,N1,N1,X1,X2,X3,X4)
+c module 2: array elements
+      E1(1)=1.0D0 
+      E1(2)=-1.0D0
+      E1(3)=-1.0D0
+      E1(4)=-1.0D0
+      IF(N2)29,29,21
+   21 DO 28 I=1,N2,1
+      E1(1)=(E1(1)+E1(2)+E1(3)-E1(4))*T 
+      E1(2)=(E1(1)+E1(2)-E1(3)+E1(4))*T 
+      E1(3)=(E1(1)-E1(2)+E1(3)+E1(4))*T 
+      E1(4)=(-E1(1)+E1(2)+E1(3)+E1(4))*T
+   28 CONTINUE
+   29 CONTINUE
+      CALL POUT(2,N2,N3,N2,E1(1),E1(2),E1(3),E1(4)) 
+c module 3: array as parameter
+      IF(N3)39,39,31
+   31 DO 38 I=1,N3,1
+   38 CALL PA(E1) 
+  39  CONTINUE
+      CALL POUT(3,N3,N2,N2,E1(1),E1(2),E1(3),E1(4))
+c module 4: conditional jumps
+      J=1 
+      IF(N4)49,49,41
+   41 DO 48 I=1,N4,1
+      IF ( J .EQ. 1 ) THEN
+         J = 2
+      ELSE
+         J = 3
+      END IF
+      IF ( J .GT. 2 ) THEN
+         J = 0
+      ELSE
+         J = 1
+      END IF
+      IF ( J .LT. 1 ) THEN
+         J = 1
+      ELSE
+         J = 0
+      END IF
+   48 CONTINUE
+   49 CONTINUE
+      CALL POUT(4,N4,J,J,X1,X2,X3,X4) 
+c module 5: omitted in text 
+c module 6: integer arithmetic
+      J=1 
+      K=2 
+      L=3 
+      IF(N6)69,69,61
+   61 DO 68 I=1,N6,1
+      J=J*(K-J)*(L-K) 
+      K=L*K-(L-J)*K 
+      L=(L-K)*(K+J) 
+      E1(L-1)=J+K+L 
+      E1(K-1)=J*K*L 
+   68 CONTINUE
+   69 CONTINUE
+      CALL POUT(6,N6,J,K,E1(1),E1(2),E1(3),E1(4))
+c module 7: trig. functions 
+      X=0.5D0 
+      Y=0.5D0 
+      IF(N7)79,79,71
+   71 DO 78 I=1,N7,1
+      X=T*DATAN(T2*DSIN(X)*DCOS(X)/(DCOS(X+Y)+DCOS(X-Y)-1.0D0)) 
+      Y=T*DATAN(T2*DSIN(Y)*DCOS(Y)/(DCOS(X+Y)+DCOS(X-Y)-1.0D0)) 
+   78 CONTINUE
+   79 CONTINUE
+      CALL POUT(7,N7,J,K,X,X,Y,Y)
+c module 8: procedure calls 
+      X=1.0D0 
+      Y=1.0D0 
+      Z=1.0D0 
+      IF(N8)89,89,81
+   81 DO 88 I=1,N8,1
+   88 CALL P3(X,Y,Z)
+   89 CONTINUE
+      CALL POUT(8,N8,J,K,X,Y,Z,Z)
+c module 9: array references 
+      J=1 
+      K=2 
+      L=3 
+      E1(1)=1.0D0 
+      E1(2)=2.0D0 
+      E1(3)=3.0D0 
+      IF(N9)99,99,91
+   91 DO 98 I=1,N9,1
+   98 CALL P0 
+   99 CONTINUE
+      CALL POUT(9,N9,J,K,E1(1),E1(2),E1(3),E1(4))
+c module 10: integer arithmetic
+      J=2 
+      K=3 
+      IF(N10)109,109,101
+  101 DO 108 I=1,N10,1
+      J=J+K 
+      K=J+K 
+      J=K-J 
+      K=K-J-J 
+  108 CONTINUE
+  109 CONTINUE
+      CALL POUT(10,N10,J,K,X1,X2,X3,X4)
+c module 11: standard functions
+      X=0.75D0
+      IF(N11)119,119,111
+  111 DO 118 I=1,N11,1
+  118 X=DSQRT(DEXP(DLOG(X)/T1)) 
+119   CONTINUE
+      CALL POUT(11,N11,J,K,X,X,X,X) 
+1001  continue
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'DP MEGA-WHETSTONES:' , ASAVE / 10.D0 ,
+     +               ', DP MWIPS:', ASAVE / 10.D0 / TIME1 
+      WRITE ( 1 , 9000 ) 'DP MEGA-WHETSTONES:' , ASAVE / 10.D0 ,
+     +               ', DP MWIPS:', ASAVE / 10.D0 / TIME1 
+     +   , ', Total Wall Time:',TIME1
+ 9000 FORMAT ( 1X , A , E10.2 , A , E20.3 , A , E20.5 ) 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+C SUBROUTINE PA 
+      SUBROUTINE PA(E)
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+      DOUBLE PRECISION T,T1,T2,E
+      COMMON T,T1,T2
+      DIMENSION E(4)
+      J=0 
+1     E(1)=(E(1)+E(2)+E(3)-E(4))*T
+      E(2)=(E(1)+E(2)-E(3)+E(4))*T
+      E(3)=(E(1)-E(2)+E(3)+E(4))*T
+      E(4)=(-E(1)+E(2)+E(3)+E(4))/T2
+      J=J+1 
+      IF ( J .LT. 6 ) GO TO 1 
+      RETURN
+      END 
+C SUBROUTINE P0 
+      SUBROUTINE P0 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+      DOUBLE PRECISION T,T1,T2,E1 
+      COMMON T,T1,T2,E1(4),J,K,L
+      E1(J)=E1(K) 
+      E1(K)=E1(L) 
+      E1(L)=E1(J) 
+      RETURN
+      END 
+C SUBROUTINE P3 
+      SUBROUTINE P3(X,Y,Z)
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+      DOUBLE PRECISION T,T1,T2,X1,Y1,X,Y,Z
+      COMMON T,T1,T2
+CJK   X1=X
+CJK   Y1=Y
+CJK   X1=T*(X1+Y1)
+CJK   Y1=T*(X1+Y1)
+CJK   Z=(X1+Y1)/T2
+      X = T * ( X + Y ) 
+      Y = T * ( X + Y ) 
+      Z = ( X + Y ) / T2
+      RETURN
+      END 
+C SUBROUTINE POUT 
+      SUBROUTINE POUT(LOOP,N,J,K,X1,X2,X3,X4)
+c
+c output fotrmat:
+c module#  num loops  J   K   X1   X2   X3   X4
+c meaning of output:
+c 1  = basic xform... => J=K=num calls x1..x4 == 1.0
+c 2  = basic xform+static subscripts... => J=num calls for module3,K=num calls x1..x4 == 1.0
+c 3  = basic xform+static subscripts+sub call*6 with divergent scale... => J=K=num calls for module2 x1..x4 == 1.0??
+c 4  = cond jumps... => J=K -> mod(#loops,2)+1 ; x1..x4 == meaningless == module3 values
+c 6  = int arith... => J->1,K->2,L->3 ; x1..x4 == meaningless == module3 values
+c 7  = trig xform... => x,y ~== 0.5
+c 8  = procedure calls... => J,K meaningless x1=x2~=1.0,x3=x4=~=1.0
+c 9  = array permutation... => J==1,K==2,L==3 x1,x2,x3=rotate(1.0,2.0,3.0) x4=meaningless
+c 10 = int arith... => J,K=rotate(2,3) x1..x4 == meaningless
+c 11 = sqrt,exp,ln xform... =>J,K meaningless x1=x2=x3=x4~== 0.75
+c
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+      SAVE START
+      PARAMETER (MODIM = 11)
+      DOUBLE PRECISION X1,X2,X3,X4
+      CHARACTER*20  MODNAME(MODIM)
+      DATA START / 0.0D0 /
+      DATA MODNAME /'simple identifiers','array elements',
+     + 'array as parameter','conditional jumps',
+     + 'omitted','integer arithmetic',
+     + 'trig. functions','procedure calls',
+     + 'array references','integer arithmetic',
+     + 'standard functions' /
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( END ) 
+C 
+C PRINT THE REPORT
+C 
+      IF ( LOOP .LT. 1 .OR. LOOP .GT. MODIM ) RETURN
+      IF ( LOOP .EQ. 1 ) THEN
+        WRITE(1,2)'num loops','J','K','X1','X2','X3','X4',
+     +  'time(secs)','secs/loop'
+      END IF
+      TIME1 = END - START 
+      IF ( START .EQ. 0.0D0 ) TIME1 = 0.0D0 
+      CPS = 0.0D0 
+      IF ( N .NE. 0 ) CPS = TIME1 / N 
+      print *," WHETSTONE ",MODNAME(LOOP)," module complete"
+      WRITE(1,1)MODNAME(LOOP),LOOP,N,J,K,X1,X2,X3,X4,TIME1,CPS 
+C 
+C SAVE THE CPU TIME FOR USE IN THE NEXT CALL TO POUT
+C 
+      START = END 
+1     FORMAT(A20,'  module',I3,3I11,4E12.4,5X,2E12.4) 
+2     FORMAT('Module Name',9x,8x,3x,3A11,4A12,5X,2A12) 
+C 
+C    R   E   T   U   R   N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE FFTES ( EVFR , ESFR , A , B , ILEN , N ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+C 
+C THIS ROUTINE CALCULATES THE FLOP RATE FOR THE SFFT FFT ROUTINE AS 
+C A FUNCTION OF VECTOR LENGTH 
+C 
+C CALLING PARAMETERS :
+C 
+C  EVFR        (REAL) THE ESTIMATED VECTOR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  ESFR        (REAL) THE ESTIMATED SCALAR FLOP RATE OF THE MACHINE IN
+C              FLOATING POINT OPERATIONS PER SECOND 
+C 
+C  A           (COMPLEX) SCRATCH ARRAY USED FOR THE TEST
+C 
+C  B           (COMPLEX) SCRATCH ARRAY USED TO CHECK THE RESULTS
+C 
+C  ILEN        (INTEGER) THE LOG BASE 2 OF THE LENGTH OF THE TRANSFORMS 
+C 
+C  N           (INTEGER) THE LENGTH OF THE TRANSFORMS 
+C 
+C --------------------------------------------------------------------- 
+C 
+C 
+      DIMENSION A(N)
+      DIMENSION B(N)
+C 
+      COMPLEX*16 A
+      COMPLEX*16 B
+C 
+      COMMON / PI / PI
+C 
+C 
+C STORE THE VALUE OF PI IN THE COMMON BLOCK 
+C 
+      PI = DACOS ( -1.0D0 ) 
+C 
+C 
+C CALCULATE THE NUMBER OF TIMES THAT THE TRANSFORM ROUTINE SHOULD BE
+C CALLED BASED ON THE ESTIMATED SPEED OF THE MACHINE.  THE GOAL IS
+C TO RUN THIS TEST FOR 30 SECONDS.
+C 
+      I2 = ( ( EVFR + ESFR ) / 2.0D0 ) * 30.D0 / ( 10.D0 * ILEN * N  )
+      I2 = ( I2 / 4 ) * 4 
+C 
+C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
+C AND RETURN
+C 
+      IF ( I2 .LE. 0 ) THEN 
+         PRINT 8000 , 'FFT' , N 
+ 8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
+     +  , ' FOR LENGTH = ' , I10 )
+         RETURN 
+      END IF
+      FLOPS = DFLOAT(I2) * 10.D0 * ILEN * N 
+C 
+C INITIALIZE THE VECTOR 
+C 
+      DO 100 I = 1 , N
+      A(I) = DCMPLX ( DSIN ( 2.D0 * PI * ( I - 1 ) / ( N - 1 ) ) ,
+     +                0.0D0 )
+      B(I) = A(I) 
+  100 CONTINUE
+C 
+C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
+C 
+      CALL GETSEC ( START ) 
+C 
+C DO THE TEST 
+C 
+      DO 200 I = 1 , I2 
+      CALL SFFT ( A , ILEN )
+  200 CONTINUE
+C 
+C GET THE ENDING CPU TIME 
+C 
+      CALL GETSEC ( END ) 
+C 
+C CALCULATE THE TOTAL CPU TIME FOR THIS TEST
+C 
+      TIME1 = END - START 
+C 
+C PRINT THE REPORT
+C 
+      WRITE ( * , 9000 ) 'FFT' , N , ILEN , FLOPS / TIME1 
+      WRITE ( 1 , 9000 ) 'FFT' , N , ILEN , FLOPS / TIME1 
+     +   , I2 , TIME1 
+ 9000 FORMAT ( 1X , A20 , 2I10 , E20.3 , I15 , E20.5 )
+C 
+C CHECK THE RESULTS 
+C 
+      AMAXER = 0.0D0
+      DO 600 I = 1 , N
+         AMAXER = MAX ( AMAXER , ABS ( A(I) - B(I) ) )
+  600 CONTINUE
+c      PRINT * , ' MAX ERROR FOR FFT =' , AMAXER 
+C 
+C     R  E  T  U  R  N
+C 
+      RETURN
+C 
+      END 
+      SUBROUTINE SFFT ( A , M ) 
+      IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
+      COMPLEX*16 A(1) , U , W , T 
+      COMMON / PI / PI
+      N = 2**M
+      NV2 = N / 2 
+      NM1 = N - 1 
+      J = 1 
+      DO 50 I = 1 , NM1 
+           IF ( I .GE. J ) GO TO 20 
+           T = A(J) 
+           A(J) = A(I)
+           A(I) = T 
+   20      K = NV2
+   30      IF ( K .GE. J ) GO TO 40 
+                J = J - K 
+                K = K / 2 
+                GO TO 30
+  40       J = J + K
+  50  CONTINUE
+C 
+C TRANSFORM 
+C 
+      LE = 1
+      DO 80 L = 1 , M 
+           LE1 = LE 
+           LE = 2*LE1 
+           U = (1.0D0,0.0D0)
+           ANG = PI / DFLOAT(LE1)
+           W = DCMPLX ( DCOS ( ANG ) , - DSIN ( ANG ) ) 
+           DO 70 J = 1 , LE1
+                DO 60 I = J , N , LE
+                     IP = I + LE1 
+                     T = U * A(IP)
+                     A(IP) = A(I) - T 
+                     A(I) = A(I) + T
+   60           CONTINUE
+                U = U * W 
+   70      CONTINUE 
+   80 CONTINUE
+C 
+C NORMALIZE THE VECTOR
+C 
+      ANORM = 1.0D0 / DSQRT ( DFLOAT ( N ) )
+      DO 90 I = 1 , N 
+         A(I) = A(I) * ANORM
+   90 CONTINUE
+C 
+      RETURN
+      END 
+      real function secnds ( dum )
+      save
+      secnds = mclock() * 0.001
+      return
+      end
+      double precision function CDABS1 ( arg )
+      implicit double precision ( A - H , O - Z )
+      complex*16 arg
+      complex arg8
+      arg8 = arg
+      CDABS1 = cabs ( arg8 )
+c      CDABS1 = REAL ( arg * CMPLX ( REAL ( arg ) , - AIMAG ( arg ) ) )
+      return
+      end
+
