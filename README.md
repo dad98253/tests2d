@@ -1,7 +1,9 @@
 # tests2d
 fortran benchmark - tests various things of interest to scientific computing
 
-Emphasis is on things commonly used in computational electromagnetics.
+The purpose of the benchmark is to gain a detailed understanding of the performance of the compiler
+and hardware in order to effect fine tuning of large number crunching codes. Emphasis is on things
+commonly used in computational electromagnetics.
 
 1) Compiler ability to optimize double precision vector computations (DAXPY/ZAXPY/ZDOTU/DDOT)
 2) DP and complex DP matrix-vector and matrix-matrix operations
