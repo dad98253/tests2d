@@ -11,13 +11,13 @@ Emphasis is on things commonly used in computational electromagnetics.
 6) the ability to optimize a simple DP FFT
 7) and finally, a compiled DP WHETSTONE test (just for fun :) (Hey, managers love Whets!)
 
-The vector, matrix, and I/O tests are run for various length (sizes) to evaluate the compiler's
-ability to utilize the hardware caches and/or vector registers. Use the parameters prompted
-for at the start of the program to estimate how fast you think the machine is. These tests can
-take a long time to run. So, choose wisely! If your guess is accurate, it will equate to about
-a ten second test loop. The code uses wall time, so you'll probably want each loop to run this
-long to get a reasonably accurate (~1.5 digits??) result. Trig function loop sizes are a swag,
-so check your output for how long these loops run.
+The vector, matrix, and I/O tests are run for various length (sizes) and strides to evaluate
+the compiler's ability to utilize the hardware caches and/or vector registers. Use the parameters
+prompted for at the start of the program to estimate how fast you think the machine is. These 
+tests can take a long time to run. So, choose wisely! If your guess is accurate, it will equate
+to about a ten second test loop. The code uses wall time, so you'll probably want each loop to
+run this long to get a reasonably accurate (~1.5 digits??) result. Trig function loop sizes are
+a swag, so check your output for how long these loops run.
 
 The code probably won't auto-parallelize. However, some of the loops are written in such a way
 that they are performing identical operations in each outer pass. So, a really smart compiler
