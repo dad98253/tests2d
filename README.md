@@ -14,10 +14,13 @@ Emphasis is on things commonly used in computational electromagnetics.
 The vector, matrix, and I/O tests are run for various length (sizes) to evaluate the compiler's
 ability to utilize the hardware caches and/or vector registers. Use the parameters prompted
 for at the start of the program to estimate how fast you think the machine is. These tests can
-take a long time to run. So, choose wisely!
+take a long time to run. So, choose wisely! If your guess is accurate, it will equate to about
+a ten second test loop. The code uses wall time, so you'll probably want each loop to run this
+long to get a reasonably accurate (~1.5 digits??) result. Trig function loop sizes are a swag,
+so check your output for how long these loops run.
 
-There is a vector of bools initialized to all .true.; you can use this to turn off tests that
-you are not interested in.
+There is a vector of bools initialized to all .true. near the top of the code; you can use this
+to turn off tests that you are not interested in.
 
 Some of the code has been purposely written to attempt to confuse an optimizing compiler. A 
 good compiler should be smart enough to catch these. 
