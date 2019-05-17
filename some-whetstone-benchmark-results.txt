@@ -1,0 +1,28 @@
+ whetstone  I=100
+ Intel i5-4690 CPU @ 3.50GHz; gfortran v7.4.0; flang/clang v7.1.0
+ (gfortran opts=Ofast -static; flang opts=-Ofast -march=native -static)
+program			gfortran	flang		(gfortran % faster)
+GOPR13			12640.4		9747.6		(30)
+whetd			13073.8		9912.2		(32)
+tests2d			12898.6		9762.5		(32)
+
+Note: flang throws "ieee_inexact is signaling" warning (ignored)
+
+
+
+an example of bad results (run using the whets.c from the byte-unixbench package):
+same machine, same compiler options as above!
+					gcc		clang
+whets.c (out of box)			3558.8
+whets.c	(timing routine fixed)		1632.8		1705.6
+whets.c (fixed - like paper)		13883.7		13894.1
+
+Note2: The third try achieved gcc results identical to the gfortran results for whetd.for (which
+it should, since gfortran and gcc share the same core compiler and whets.c is basically a c version
+of whetd.for)
+I'm not sure why my flang results are disappointing. They should be as good as clang :(
+
+ (the second and third versions of whets.c are included for your enjoyment as whets_bad.c and whets_good.c)
+ 
+
+
