@@ -96,7 +96,7 @@ C
       ELSE
          EVFR = 1 000 000 000.0D0
          EIOR =    90 000 000.0D0
-         ESFR = 1 000 000 000.0D0      	  
+         ESFR = 3 000 000 000.0D0      	  
       ENDIF
 C 
 C 
@@ -371,6 +371,9 @@ C
          AIOL = AI2 / AMAXSIZ
          IOL = MAX(1.0D0,AIOL)
          NLOOP = MAX( 1.0D0 , AI2 / DBLE(IOL) )
+         TOTLOOP = NLOOP * IOL
+         NLOOP = 100
+         IOL = MAX(1,INT8(TOTLOOP/NLOOP))
          CALL WHETS ( NLOOP , IOL )
       ENDIF
 C 
@@ -2330,11 +2333,6 @@ C
       RAN3 = MJ * FAC 
       RETURN
       END 
-      REAL FUNCTION SECOND ( DUM )
-      SAVE
-      SECOND = mclock() * 0.001
-      RETURN
-      END 
       SUBROUTINE DAXPY(N,DA,DX,INCX,DY,INCY)
 C 
 C     CONSTANT TIMES A VECTOR PLUS A VECTOR.
@@ -2511,6 +2509,8 @@ C COMPILED BY RICHARD GILLMANN (GILLMANN@ISIB)
 C 
       DOUBLE PRECISION X1,X2,X3,X4,X,Y,Z,T,T1,T2,E1 
       COMMON T,T1,T2,E1(4),J,K,L
+      COMMON /LAST/ LASTCALL
+      LOGICAL LASTCALL
 C I=10 CORRESPONDS TO ONE MILLION WHETSTONE INSTRUCTIONS
 C 
 C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
@@ -2522,9 +2522,14 @@ C
      +  , ' FOR I = ' , I10 ) 
          RETURN 
       END IF
+C
+C LASTCALL SIGNALS THE POUT ROUTINE THAT WE ARE IN THE LAST PASS OF THE OUTER LOOP
+C
+      LASTCALL = .FALSE.
       ASAVE = DBLE(I) * DBLE(IOL) 
       CALL GETSEC ( START )
       do 1001 IJK = 1 , IOL 
+      IF ( IJK .EQ. IOL ) LASTCALL = .TRUE.
 c initialise constants
 CJK   I=10
 c read value of i, controlling total weight: if i=10 the
@@ -2682,12 +2687,13 @@ C
 C 
 C PRINT THE REPORT
 C 
-      WRITE ( * , 9000 ) 'DP MEGA-WHETSTONES:' , ASAVE / 10.D0 ,
+      WRITE ( * , 9001 ) 'DP MEGA-WHETSTONES:' , ASAVE / 10.D0 ,
      +               ', DP MWIPS:', ASAVE / 10.D0 / TIME1 
       WRITE ( 1 , 9000 ) 'DP MEGA-WHETSTONES:' , ASAVE / 10.D0 ,
      +               ', DP MWIPS:', ASAVE / 10.D0 / TIME1 
      +   , ', Total Wall Time:',TIME1
  9000 FORMAT ( 1X , A , E10.2 , A , E20.3 , A , E20.5 ) 
+ 9001 FORMAT ( 1X , A , F20.0 , A , F20.1  ) 
 C 
 C     R  E  T  U  R  N
 C 
@@ -2754,6 +2760,8 @@ c
       IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
       SAVE START
       PARAMETER (MODIM = 11)
+      COMMON /LAST/ LASTCALL
+      LOGICAL LASTCALL
       DOUBLE PRECISION X1,X2,X3,X4
       CHARACTER*20  MODNAME(MODIM)
       DATA START / 0.0D0 /
@@ -2763,6 +2771,10 @@ c
      + 'trig. functions','procedure calls',
      + 'array references','integer arithmetic',
      + 'standard functions' /
+C 
+C SKIP ALL OUTPUT IF THIS ISNT THE LAST CALL
+C
+      IF ( .NOT. LASTCALL ) RETURN      
 C 
 C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
 C 
@@ -2946,9 +2958,24 @@ C
 C 
       RETURN
       END 
+      REAL FUNCTION SECOND ( DUM )
+      SAVE
+c      SECOND = mclock() * 0.001
+      call cpu_time(SECOND)
+      if ( SECOND .lt. 0.0 ) then
+              print *, " cpu_time not working - see SECOND routine"
+              stop
+      endif
+      RETURN
+      END
       real function secnds ( dum )
       save
-      secnds = mclock() * 0.001
+c      SECOND = mclock() * 0.001
+      call cpu_time(SECOND)
+      if ( secnds .lt. 0.0 ) then
+              print *, " cpu_time not working - see secnds routine"
+              stop
+      endif
       return
       end
       double precision function CDABS1 ( arg )
