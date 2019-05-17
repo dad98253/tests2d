@@ -2730,14 +2730,14 @@ C SUBROUTINE P3
       IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
       DOUBLE PRECISION T,T1,T2,X1,Y1,X,Y,Z
       COMMON T,T1,T2
-CJK   X1=X
-CJK   Y1=Y
-CJK   X1=T*(X1+Y1)
-CJK   Y1=T*(X1+Y1)
-CJK   Z=(X1+Y1)/T2
-      X = T * ( X + Y ) 
-      Y = T * ( X + Y ) 
-      Z = ( X + Y ) / T2
+      X1=X
+      Y1=Y
+      X1=T*(X1+Y1)
+      Y1=T*(X1+Y1)
+      Z=(X1+Y1)/T2
+CJK      X = T * ( X + Y ) 
+CJK      Y = T * ( X + Y ) 
+CJK      Z = ( X + Y ) / T2
       RETURN
       END 
 C SUBROUTINE POUT 
