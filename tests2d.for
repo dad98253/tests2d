@@ -12,13 +12,15 @@ C SPEED TESTS.
 C 
       PARAMETER ( NJ = 650 000 )
       PARAMETER ( NJR = NJ * 2 )
-      PARAMETER ( LOTS = 1000000 )
+C      PARAMETER ( LOTS = 1000000 )
+      PARAMETER ( LOTS = 1       )
       PARAMETER ( NUMTESTS = 22 )
 C 
       COMPLEX*16 A(NJ),B(NJ),C(NJ)
       DIMENSION RA(NJR),RB(NJR),RC(NJR)
       LOGICAL TESTFLAG(NUMTESTS)
       CHARACTER*25 TESTNAME(NUMTESTS)
+      INTEGER IOPTIONS(NUMTESTS)
 C 
 C 
 C THE FOLLOWING ARE THE VARIOUS VECTOR AND MATRIX SIZES THAT ARE TO 
@@ -36,6 +38,7 @@ C
 C 
       LOGICAL ASYNC
       LOGICAL PROMPT
+      LOGICAL LASTCALL
 C 
       INTRINSIC DATAN2 
       INTRINSIC DSIN 
@@ -45,6 +48,7 @@ C
       INTRINSIC DLOG 
 C 
       COMMON /ASYFLG/ ASYNC 
+      COMMON /LAST/ LASTCALL , idebug
 C 
       DATA LENVEC / 1 , 3 , 5 , 10 , 50 , 100 , 500 , 1 000 , 5 000 , 
      +              10 000 , 50 000 / 
@@ -68,12 +72,38 @@ C
 C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
 C 
       DATA IDUM / 1234567 / 
+      idebug = 0
+C
+C OPEN THE OPTIONS FILE
+C
+      OPEN ( UNIT = 1 , FILE = 'options.txt' , STATUS = 'unknown' )
+C
+C IF THE FILE IS EMPTY, RUN ALL TESTS
+C
+      READ ( 1 , * , END = 200 ) IOPTIONS
+      DO 100 I = 1 , NUMTESTS
+        IF ( IOPTIONS(I) .EQ. 0 ) TESTFLAG(I) = .FALSE.
+  100 CONTINUE
+      READ ( 1 , * , END = 200 ) idebug
+      READ ( 1 , * , END = 200 ) iprompt
+      IF ( iprompt .eq. 0 ) PROMPT = .FALSE.
+      READ ( 1 , * , END = 200 ) EVFR
+      READ ( 1 , * , END = 200 ) EIOR
+      READ ( 1 , * , END = 200 ) ESFR
+  200 CONTINUE
+      CLOSE ( 1 )
 C
 C ITEST IS THE TEST NUMBER - USED TO INDEX INTO THE BOOL TESTFLAG VECTOR
 C 	
-	  ITEST = 0
-c      do 10001 LOTSOL = 1,LOTS
-      do 10001 LOTSOL = 1,1
+      ITEST = 0
+C
+C LOTS WILL RUN THE TESTS REPEATEDLY - SOMETIMES USED TO BURN IN THE
+C COMPUTER
+C
+      do 10001 LOTSOL = 1,LOTS
+C
+C OPEN THE RESULT LOG FILE - NOTE THAT IT IS WRITTEN OVER IF EXISTING
+C
       open ( unit = 1 , file = 'host.dat' , status = 'unknown' )
 c 
 C ASYNC MUST BE SET TO .TRUE. IF THE ASYNCHONOUS I/O TEST IS TO BE
@@ -86,18 +116,21 @@ C
       IF ( PROMPT ) THEN	
          PRINT * , ' ENTER ESTIMATED VECTOR FLOP RATE IN FLOATING' , 
      +          ' POINT OPERATIONS PER SECOND :'
-         READ ( * , * ) EVFR 
+         IF ( EVFR .EQ. 0 ) READ ( * , * ) EVFR 
          PRINT * , ' ENTER THE ESTIMATED I/O RATE IN SINGLE PRECISION' , 
      +          ' WORDS PER SECOND :' 
-         READ ( * , * ) EIOR 
+         IF ( EIOR .EQ. 0 ) READ ( * , * ) EIOR 
          PRINT * , ' ENTER ESTIMATED SCALAR FLOP RATE IN FLOATING ' ,
      +          'POINT OPERATIONS PER SECOND :' 
-         READ ( * , * ) ESFR 
+         IF ( ESFR .EQ. 0 ) READ ( * , * ) ESFR 
       ELSE
          EVFR = 1 000 000 000.0D0
          EIOR =    90 000 000.0D0
          ESFR = 3 000 000 000.0D0      	  
       ENDIF
+      PRINT * , ' estimated vector rate = ' , EVFR
+      PRINT * , ' estimated i/o rate    = ' , EIOR
+      PRINT * , ' estiamted scalar rate = ' , ESFR
 C 
 C 
 C ********************************************************************* 
@@ -109,7 +142,7 @@ C ZAXPY TEST :
 C       
 	  ITEST = ITEST + 1
 	  IF ( TESTFLAG(ITEST) ) THEN
-	     PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...'
+	     PRINT *, 'Starting ' , TESTNAME(ITEST) , ' test...' ,ITEST
       DO 1100 ISTR = 1 , 1
          DO 1000 ILEN = 1 , 11
             IF ( LENVEC(ILEN) * ISTRYD(ISTR) .GT. NJ ) GO TO 1000 
@@ -740,9 +773,9 @@ C
       DO 210 IJK = 1, IOL
       DO 200 I = 1 , I2 
       C = ZDOTU ( ILEN , B , ISTR , A , ISTR )
-      A(1) = C
+      A(1) = A(1) + C * 1.0D-6
   200 CONTINUE
-      B(1) = C
+      B(1) = B(1) - C * 1.0D-6
   210 CONTINUE
 C 
 C GET THE ENDING CPU TIME 
@@ -839,9 +872,9 @@ C
       DO 210 IJK = 1 , IOL
       DO 200 I = 1 , I2 
       C = DDOT ( ILEN , B , ISTR , A , ISTR ) 
-      B(1) = C
+      B(1) = B(1) + C * 1.0D-6
   200 CONTINUE
-      A(1) = C
+      A(1) = A(1) - C * 1.0D-6
   210 CONTINUE
 C 
 C GET THE ENDING CPU TIME 
@@ -2494,7 +2527,7 @@ C
       ZDOTU = ZTEMP 
       RETURN
       END 
-      SUBROUTINE WHETS ( I , IOL)
+      SUBROUTINE WHETS ( IX , IOL)
       IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
 C WHETSTONE BENCHMARK PROGRAM 
 C 
@@ -2509,14 +2542,14 @@ C COMPILED BY RICHARD GILLMANN (GILLMANN@ISIB)
 C 
       DOUBLE PRECISION X1,X2,X3,X4,X,Y,Z,T,T1,T2,E1 
       COMMON T,T1,T2,E1(4),J,K,L
-      COMMON /LAST/ LASTCALL
+      COMMON /LAST/ LASTCALL , idebug
       LOGICAL LASTCALL
-C I=10 CORRESPONDS TO ONE MILLION WHETSTONE INSTRUCTIONS
+C IX=10 CORRESPONDS TO ONE MILLION WHETSTONE INSTRUCTIONS
 C 
 C IF THE LOOP COUNT IS TO BE SET TO ZERO, PRINT AN ERROR MESSAGE
 C AND RETURN
 C 
-      IF ( I .LE. 0 ) THEN
+      IF ( IX .LE. 0 ) THEN
          PRINT 8000 , 'WHETSTONE' , ILEN
  8000 FORMAT ( ' WARNING : THE ' , A , ' TEST CANNOT BE PERFORMED'
      +  , ' FOR I = ' , I10 ) 
@@ -2526,31 +2559,32 @@ C
 C LASTCALL SIGNALS THE POUT ROUTINE THAT WE ARE IN THE LAST PASS OF THE OUTER LOOP
 C
       LASTCALL = .FALSE.
-      ASAVE = DBLE(I) * DBLE(IOL) 
+      ASAVE = DBLE(IX) * DBLE(IOL) 
       CALL GETSEC ( START )
-      do 1001 IJK = 1 , IOL 
+      do 1001 IJK = 1 , IOL
+      if ( idebug .gt. 0 ) print * , ' IJK = ' , IJK 
       IF ( IJK .EQ. IOL ) LASTCALL = .TRUE.
 c initialise constants
-CJK   I=10
-c read value of i, controlling total weight: if i=10 the
+CJK   IX=10
+c read value of ix, controlling total weight: if ix=10 the
 c total weight is one million Whetstone instructions
 CJK   T1=050025000
       T1=0.50025000D0 
       T=0.499975000D0 
       T2=2.0000D0 
       N1=0
-      N2=12*I 
-      N3=14*I 
-CJK   N4=348*I
-      N4=345*I
+      N2=12*IX 
+      N3=14*IX 
+CJK   N4=348*IX
+      N4=345*IX
       N5=0
-      N6=210*I
-      N7=32*I 
-      N8=899*I
-CJK   N9=516*I
-      N9=616*I
+      N6=210*IX
+      N7=32*IX 
+      N8=899*IX
+CJK   N9=516*IX
+      N9=616*IX
       N10=0 
-      N11=93*I
+      N11=93*IX
       N12=0 
 c module 1: simple identifiers
       X1=1.0D0
@@ -2760,7 +2794,7 @@ c
       IMPLICIT DOUBLE PRECISION ( A - H , O - Z ) 
       SAVE START
       PARAMETER (MODIM = 11)
-      COMMON /LAST/ LASTCALL
+      COMMON /LAST/ LASTCALL , idebug
       LOGICAL LASTCALL
       DOUBLE PRECISION X1,X2,X3,X4
       CHARACTER*20  MODNAME(MODIM)
@@ -2774,7 +2808,7 @@ c
 C 
 C SKIP ALL OUTPUT IF THIS ISNT THE LAST CALL
 C
-      IF ( .NOT. LASTCALL ) RETURN      
+      IF ( .NOT. LASTCALL .AND. idebug .lt. 1 ) RETURN      
 C 
 C THE GETSEC ROUTINE RETURNS ACCUMULATED CPU SECONDS
 C 
