@@ -12,8 +12,6 @@ C SPEED TESTS.
 C 
       PARAMETER ( NJ = 650 000 )
       PARAMETER ( NJR = NJ * 2 )
-C      PARAMETER ( LOTS = 1000000 )
-      PARAMETER ( LOTS = 1       )
       PARAMETER ( NUMTESTS = 22 )
 C 
       COMPLEX*16 A(NJ),B(NJ),C(NJ)
@@ -73,6 +71,7 @@ C IDUM IS THE SEED FOR THE RANDOM NUMBER GENERATOR
 C 
       DATA IDUM / 1234567 / 
       idebug = 0
+      LOTS = 1
 C
 C OPEN THE OPTIONS FILE
 C
@@ -90,6 +89,7 @@ C
       READ ( 1 , * , END = 200 ) EVFR
       READ ( 1 , * , END = 200 ) EIOR
       READ ( 1 , * , END = 200 ) ESFR
+      READ ( 1 , * , END = 200 ) LOTS
   200 CONTINUE
       CLOSE ( 1 )
 C
